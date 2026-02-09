@@ -16,9 +16,8 @@ import fr.agile.JiraApiClient;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.dto.SprintKpiInfo;
-import fr.agile.service.SprintService;
 import fr.agile.service.SprintStatsService;
-import fr.agile.utils.BurnupUtils;
+import fr.agile.service.SprintDtoEnricher;
 
 @RestController
 @RequestMapping("/api/jira")
@@ -28,8 +27,8 @@ public class JiraController {
     private static final Logger log = LoggerFactory.getLogger(JiraController.class);
 
     @Autowired private JiraApiClient jiraApiClient;
-    @Autowired private SprintService sprintService;
     @Autowired private SprintStatsService sprintStatsService;
+    @Autowired private SprintDtoEnricher sprintDtoEnricher;
 
     @GetMapping("/burnup/{sprintId}")
     public BurnupDataDTO getBurnupData(@PathVariable Long sprintId) throws Exception {
@@ -49,30 +48,7 @@ public class JiraController {
         log.info("Récupération des sprints pour le projet {}", projectKey);
         List<SprintInfoDTO> sprints = jiraApiClient.getAllSprintsForBoard(6);
 
-        for (SprintInfoDTO dto : sprints) {
-            sprintService.getById(dto.getId()).ifPresent(si -> {
-                if (si.getVelocity() != null) {
-                    dto.setVelocity(BurnupUtils.roundToTwoDecimals(si.getVelocity()));
-                }
-                if (si.getVelocityStart() != null) {
-                    dto.setVelocityStart(BurnupUtils.roundToTwoDecimals(si.getVelocityStart()));
-                }
-                if (si.getEndDate() != null) {
-                    dto.setEndDate(si.getEndDate());
-                }
-                if (si.getStartDate() != null) {
-                    dto.setStartDate(si.getStartDate());
-                }
-                if (si.getCompleteDate() != null) {
-                    dto.setCompleteDate(si.getCompleteDate());
-                }
-            });
-            if (dto.getVelocityStart() == null) {
-                sprintService.getAvgVelocityLastClosedAndActive(dto.getOriginBoardId(), 5)
-                        .ifPresent(dto::setVelocityStart);
-            }
-        }
-        return ResponseEntity.ok(sprints);
+        return ResponseEntity.ok(sprintDtoEnricher.enrich(sprints));
     }
 
 
