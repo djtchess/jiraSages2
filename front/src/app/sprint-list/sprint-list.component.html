@@ -35,9 +35,6 @@
         <button mat-stroked-button color="primary" (click)="openCapacityView(6, sprint.id)">
           <mat-icon>visibility</mat-icon> Capacité dev
         </button>
-        <button mat-stroked-button color="accent" (click)="toggleEpicDurationChart()">
-          <mat-icon>bar_chart</mat-icon> Durée épics
-        </button>
       </td>
     </ng-container>
 
@@ -93,15 +90,5 @@
       [sprintId]="selectedScopeSprintId"
       style="display: block; width: 100%;">
     </app-sprint-scope>
-  </div>
-</div>
-
-
-<div
-  *ngIf="showEpicDurationChart"
-  style="margin-top: 20px; display: flex; flex-direction: column; align-items: center;">
-  <h4 style="margin-bottom: 10px;">Durée des épics par sprint et version</h4>
-  <div style="width: 100%; max-width: 1500px;">
-    <app-epic-duration-chart [projectKey]="'SAG'" [boardId]="6"></app-epic-duration-chart>
   </div>
 </div>

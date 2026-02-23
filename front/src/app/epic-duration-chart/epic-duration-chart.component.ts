@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -21,7 +21,7 @@ import { SprintVersionEpicDuration } from '../../model/epic-duration.model';
   templateUrl: './epic-duration-chart.component.html',
   styleUrl: './epic-duration-chart.component.css'
 })
-export class EpicDurationChartComponent implements OnChanges {
+export class EpicDurationChartComponent implements OnInit, OnChanges {
   @Input() projectKey = 'SAG';
   @Input() boardId = 6;
 
@@ -31,6 +31,10 @@ export class EpicDurationChartComponent implements OnChanges {
   chartOptions: EChartsOption = {};
 
   constructor(private jiraService: JiraService) {}
+
+  ngOnInit(): void {
+    this.loadData();
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['projectKey'] || changes['boardId']) && this.projectKey && this.boardId) {
