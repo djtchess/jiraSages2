@@ -1,0 +1,14 @@
+.fullwidth { width: 100%; }
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+table { border-radius: 12px; overflow: hidden; }
+th, td { white-space: nowrap; }

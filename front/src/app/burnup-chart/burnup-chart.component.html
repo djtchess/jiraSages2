@@ -1,0 +1,62 @@
+<!-- Spinner pendant le chargement -->
+<div *ngIf="isLoading" class="spinner-container">
+  <mat-progress-spinner mode="indeterminate" color="primary"></mat-progress-spinner>
+</div>
+
+<!-- Contenu principal : graphique + données -->
+<div *ngIf="!isLoading" class="burnup-container">
+  <!-- Graphique -->
+  <div class="chart-container">
+    <echarts
+      [options]="chartOptions"
+      (chartInit)="onChartInit($event)"
+      class="chart">
+    </echarts>
+  </div>
+
+  <!-- Données complémentaires -->
+<div class="info-box">
+
+
+  <h3>Données du sprint</h3>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">{{ sprintInfo.burnupData.velocity }}</div>
+      <div class="stat-label">Vélocité en cours</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-value">{{ sprintInfo.burnupData.totalJH }}</div>
+      <div class="stat-label">Total JH</div>
+    </div>
+      <div class="stat">
+      <div class="stat-value">{{ sprintInfo.velocityStart }}</div>
+      <div class="stat-label">Vélocité 5 derniers sprints</div>
+    </div>
+  </div>
+
+
+  <div class="kpi-badges">
+    <span class="kpi-badge">du {{ sprintInfo.startDate | date}}</span>
+    <span class="kpi-badge">au {{ sprintInfo.endDate | date }}</span>
+  </div>
+
+  <div class="info-actions">
+    <button class="save-btn" (click)="createSprint()" aria-label="Sauvegarder le sprint">
+      <!-- Icône disquette (SVG inline, pas de lib requise) -->
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <!-- corps de la disquette + onglet -->
+        <path d="M7 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+        <!-- zone de lecture en haut -->
+        <path d="M7 3h8v6H7z" />
+        <!-- base (emplacement étiquette) -->
+        <path d="M7 13h10v8H7z" />
+      </svg>
+      Sauvegarder le sprint
+    </button>
+  </div>
+ 
+</div>
+
+</div>

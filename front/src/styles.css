@@ -1,0 +1,284 @@
+/* Global */
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+/* Dark mode sur body */
+body.dark-mode {
+  background-color: #0a0f1a;
+  color: #e0e7ff;
+}
+
+/* Conteneur calendrier */
+body.dark-mode .calendar-container {
+  background-color: #0d111a;
+  color: #e0f0ff;
+}
+
+/* Table calendrier */
+body.dark-mode .calendarTable {
+  background-color: #121a2c;
+  border-collapse: collapse;
+  color: #cbd6f6;
+  width: 100%;
+  border: 1px solid #2c3e70;
+}
+
+body.dark-mode .calendarTable td,
+body.dark-mode .calendarTable th {
+  background-color: #121a2c;
+  color: #cbd6f6;
+  border: 1px solid #2c3e70;
+  padding: 4px 6px;
+}
+
+/* Header des mois */
+body.dark-mode .calendar-header {
+  background-color: #1a2540;
+  color: #a8c4ff;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Ressources (première colonne) */
+body.dark-mode .resource {
+  background-color: #1a2540;
+  color: #a8c4ff;
+  font-weight: 500;
+}
+
+/* Dates */
+body.dark-mode .date {
+  background-color: #1c2a49;
+  color: #c5d1ff;
+  text-align: center;
+}
+
+/* Cellules événement */
+body.dark-mode .event-cell {
+  background: linear-gradient(90deg, #004488, #002244);
+  color: #bcdfff;
+  font-weight: bold;
+}
+
+/* Weekend */
+body.dark-mode .weekend {
+  background-color: #243359;
+  color: #9bb0d4;
+}
+
+/* Highlight des cellules survolées */
+body.dark-mode .highlight-cell {
+  background-color: #335599 !important;
+  color: #fff !important;
+}
+
+/* Highlight ligne ressource */
+body.dark-mode .highlight-row {
+  background-color: #2a3a6d;
+}
+
+/* Légende */
+body.dark-mode .calendar-legend {
+  background-color: #121a2c;
+  color: #a8b7ff;
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+body.dark-mode .legend-color.event {
+  background-color: #004488;
+  border-radius: 3px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+}
+
+body.dark-mode .legend-color.event-cell {
+  background: linear-gradient(90deg, #004488, #002244);
+  border-radius: 3px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+}
+
+body.dark-mode .legend-color.weekend {
+  background-color: #243359;
+  border-radius: 3px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+}
+
+body.dark-mode .legend-color.highlight-cell {
+  background-color: #335599;
+  border-radius: 3px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+}
+
+
+/* En mode clair uniquement (pas en dark-mode) */
+body:not(.dark-mode) .calendarTable td.normal-cell {
+  background-color: white;
+  border: 1px solid #cbd6f6; /* bordure légère bleutée */
+  border-radius: 8px;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+}
+
+body:not(.dark-mode) .calendarTable td.normal-cell:hover {
+  background-color: #e6f0ff; /* fond bleu clair au survol */
+  border-color: #6495ed; /* bordure bleue plus marquée au survol */
+  box-shadow: 0 0 8px rgba(100, 149, 237, 0.4);
+}
+
+
+
+
+
+/* === Styles globaux dark mode pour Angular Material === */
+
+.dark-mode .mat-form-field-label {
+  color: #8ab4f8 !important;
+}
+
+.dark-mode .mat-form-field-infix {
+  color: #ffffff !important;
+}
+
+.dark-mode .mat-select-value {
+  color: #ffffff !important;
+}
+
+.dark-mode .mat-select-arrow {
+  color: #8ab4f8 !important;
+}
+
+.dark-mode .mat-select-panel {
+  background-color: #0f1a34 !important;
+  color: #d0d9f6 !important;
+}
+
+.dark-mode .mat-option {
+  color: #d0d9f6 !important;
+}
+
+.dark-mode .mat-option:hover,
+.dark-mode .mat-option.mat-active {
+  background-color: #1a2d56 !important;
+  color: #ffffff !important;
+}
+
+.dark-mode .mat-form-field-appearance-outline .mat-form-field-outline {
+  color: #8ab4f8;
+  border-color: #8ab4f8;
+}
+
+.dark-mode .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick {
+  border-color: #3380ff !important;
+}
+
+
+
+
+
+
+
+
+/* Conteneur général */
+.dark-mode .example-container {
+  background-color: #0b1224;
+  color: #a8b9d8;
+  height: 100vh; /* pour s'assurer que le container prend tout l'écran */
+}
+
+/* Sidenav */
+.dark-mode mat-sidenav {
+  background-color: #121d40;
+  color: #c0cde8;
+  box-shadow: 2px 0 12px rgba(0, 0, 50, 0.7);
+}
+
+/* Liens dans la liste de navigation */
+.dark-mode mat-nav-list a.mat-list-item {
+  color: #a8b9d8;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Icônes dans les liens */
+.dark-mode mat-nav-list a.mat-list-item mat-icon {
+  color: #8ab4f8;
+  margin-right: 12px;
+}
+
+/* Hover et focus sur les items */
+.dark-mode mat-nav-list a.mat-list-item:hover,
+.dark-mode mat-nav-list a.mat-list-item.active {
+  background-color: #1e3a73;
+  color: #cbd6f5;
+}
+
+/* Toolbar */
+.dark-mode mat-toolbar {
+  background: linear-gradient(90deg, #001e4d 0%, #003366 100%);
+  color: #cbd6f5;
+  box-shadow: 0 2px 8px rgba(0, 51, 102, 0.8);
+}
+
+/* Bouton menu dans toolbar */
+.dark-mode mat-toolbar button.mat-icon-button mat-icon {
+  color: #8ab4f8;
+}
+
+/* Contenu principal */
+.dark-mode .main-content {
+  background-color: #0b1224;
+  color: #a8b9d8;
+  min-height: calc(100vh - 64px); /* 64px = hauteur toolbar par défaut */
+  padding: 16px;
+}
+
+
+.dark-mode {
+  background-color: #0b1224;
+  color: #a8b9d8 !important;
+}
+
+.dark-mode ::ng-deep mat-toolbar {
+  background: linear-gradient(90deg, #001e4d 0%, #003366 100%) !important;
+  color: #cbd6f5 !important;
+}
+
+.dark-mode ::ng-deep mat-toolbar button.mat-icon-button mat-icon {
+  color: #8ab4f8 !important;
+}
+
+.dark-mode ::ng-deep mat-sidenav {
+  background-color: #121d40 !important;
+  color: #c0cde8 !important;
+}
+
+.dark-mode ::ng-deep mat-nav-list a.mat-list-item {
+  color: #a8b9d8 !important;
+}
+
+.dark-mode ::ng-deep mat-nav-list a.mat-list-item mat-icon {
+  color: #8ab4f8 !important;
+}
+
+.dark-mode ::ng-deep mat-nav-list a.mat-list-item:hover,
+.dark-mode ::ng-deep mat-nav-list a.mat-list-item.active {
+  background-color: #1e3a73 !important;
+  color: #cbd6f5 !important;
+}
+
+.dark-mode ::ng-deep .main-content {
+  background-color: #0b1224 !important;
+  color: #a8b9d8 !important;
+}

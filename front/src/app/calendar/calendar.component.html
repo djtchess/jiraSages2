@@ -1,0 +1,127 @@
+<div class="calendar-container">
+  <!-- Sélecteur de mois / actions ------------------------------------------------>
+  <div class="month-selector">
+    <button mat-icon-button aria-label="Mois précédent" color="primary" (click)="prevMonth()">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+
+    <mat-form-field appearance="outline" class="compact-select" color="primary">
+      <mat-label>Mois</mat-label>
+      <mat-select [(ngModel)]="selectedMonth" (selectionChange)="onMonthChange($event.value)">
+        <mat-option *ngFor="let month of months" [value]="month.numero">
+          {{ month.libelle }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button mat-icon-button aria-label="Mois suivant" color="primary" (click)="nextMonth()">
+      <mat-icon>arrow_forward</mat-icon>
+    </button>
+
+    <button mat-raised-button color="primary" (click)="exportPdf()">Exporter le calendrier en PDF</button>
+  </div>
+
+  <!------------------------- Tableau calendrier ------------------------->
+  <div #calendarRef>
+    <table class="calendarTable" cellspacing="0" cellpadding="0" role="grid" aria-label="Calendrier des ressources">
+      <ng-container *ngFor="let vo of calendarVos; let idx = index; trackBy: trackMonth">
+
+        <!-- En-tête du mois -->
+        <tr role="row">
+          <td [attr.colspan]="32" class="calendar-header" role="columnheader">
+            {{ vo.monthFR }} {{ vo.dates[0].getFullYear() }}
+          </td>
+        </tr>
+
+        <!-- Ligne des jours -->
+        <tr role="row">
+          <td class="resource" role="rowheader">
+            Ressources
+            <button mat-icon-button color="primary" aria-label="Ajouter un mois" (click)="nextMonth()">
+              <mat-icon>add</mat-icon>
+            </button>
+          </td>
+
+          <ng-container *ngFor="let date of vo.dates; let colIdx = index; trackBy: trackDate">
+            <td
+              class="date"
+              role="gridcell"
+              [class.first-day]="date.getDate() === 1"
+              [class.last-day]="date.getDate() === DateUtils.getLastDayOfMonth(date)"
+              [class.highlight-cell]="hoveredCell?.tableIdx === idx && hoveredCell?.row === -1 && hoveredCell?.col === colIdx"
+              (mouseenter)="hoveredCell = { tableIdx: idx, row: -1, col: colIdx }"
+              (mouseleave)="hoveredCell = null">
+              {{ vo.dayLabels[colIdx] }}
+            </td>
+          </ng-container>
+
+          <!-- Remplissage 31 jours -->
+          <ng-container *ngIf="vo.dates.length < 31">
+            <td *ngFor="let _ of getEmptyDays(31 - vo.dates.length)" class="weekend" role="gridcell"></td>
+          </ng-container>
+        </tr>
+
+        <!-- Lignes des ressources -->
+        <tr *ngFor="let res of activeResources; let rowIdx = index; trackBy: trackRes" role="row">
+          <td
+            class="resource"
+            role="rowheader"
+            [class.highlight-row]="hoveredCell?.tableIdx === idx && hoveredCell?.row === rowIdx"
+            [attr.aria-label]="res.prenomResource">
+            <div class="avatar">{{ res.prenomResource.charAt(0) }}</div>
+            {{ res.prenomResource }}
+            <span class="presence-counter">({{ getPresenceDays(res, idx) }} jours)</span>
+          </td>
+
+          <!-- Spans / jours -->
+          <ng-container
+            *ngFor="let span of getSpans(res, idx); let colIdx = index; trackBy: trackSpan">
+
+            <!-- Week-end / férié / inactif -->
+            <td
+              *ngIf="(DateUtils.isWeekend(span.date) || span.date.isHoliday() || span.date.isInactif(res)) && !span.date.isEvent(res)"
+              class="weekend"
+              role="gridcell"
+              (click)="onCellClick(res, span.date)"></td>
+
+            <!-- Événement -->
+            <td
+              *ngIf="span.date.isEvent(res) && span.colspan > 0"
+              class="event-cell"
+              [attr.colspan]="Math.min(span.colspan, vo.dates.length - colIdx)"
+              [class.weekend]="isSpanOnWeekend(span, vo.dates)"
+              role="gridcell"
+              (click)="onCellClick(res, span.date)">
+              <ng-container *ngIf="span.date.isDemiJourneeEvent(res)">0.5</ng-container>
+            </td>
+
+            <!-- Cellule normale -->
+            <td
+              *ngIf="!span.date.isEvent(res) &&
+                     !(DateUtils.isWeekend(span.date) || span.date.isHoliday() || span.date.isInactif(res))"
+              class="normal-cell"
+              role="gridcell"
+              [class.highlight-cell]="hoveredCell?.tableIdx === idx && hoveredCell?.row === rowIdx && hoveredCell?.col === colIdx"
+              (mouseenter)="hoveredCell = { tableIdx: idx, row: rowIdx, col: colIdx }"
+              (mouseleave)="hoveredCell = null"
+              (click)="onCellClick(res, span.date)"></td>
+
+          </ng-container>
+
+          <!-- Remplissage -->
+          <ng-container *ngIf="vo.dates.length < 31">
+            <td *ngFor="let _ of getEmptyDays(31 - vo.dates.length)" class="weekend" role="gridcell"></td>
+          </ng-container>
+        </tr>
+      </ng-container>
+    </table>
+  </div>
+
+  <!-- Légende -------------------------------------------------------------->
+  <div class="calendar-legend" aria-label="Légende du calendrier">
+    <div class="legend-item"><span class="legend-color event"></span> Congé</div>
+    <div class="legend-item"><span class="legend-color event-cell"></span> Télétravail</div>
+    <div class="legend-item"><span class="legend-color weekend"></span> Week-end</div>
+    <div class="legend-item"><span class="legend-color highlight-cell"></span> Surlignage</div>
+  </div>
+</div>

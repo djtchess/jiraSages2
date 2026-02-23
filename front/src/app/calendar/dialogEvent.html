@@ -1,0 +1,16 @@
+<h2 mat-dialog-title>Absence pour {{data.resource}}</h2>
+<mat-dialog-content class="custom-dialog">
+    <mat-label>Choisir une date de fin</mat-label>
+    <br />
+    <input matInput [matDatepicker]="picker" [formControl]="dateCtrl">
+    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+    <mat-datepicker #picker></mat-datepicker>
+    <br />
+    <mat-checkbox [(ngModel)]="data.isJournee">Journee complète</mat-checkbox>
+    <mat-checkbox [(ngModel)]="data.isMatin">matin</mat-checkbox>
+    <mat-checkbox [(ngModel)]="data.isApresMidi">après midi</mat-checkbox>
+</mat-dialog-content>
+<mat-dialog-actions>
+  <button mat-button (click)="onNoClick()">Annuler</button>
+  <button mat-button (click)="onOkClick()" cdkFocusInitial>Ok</button>
+</mat-dialog-actions>

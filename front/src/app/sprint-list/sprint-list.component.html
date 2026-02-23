@@ -1,0 +1,94 @@
+<div class="sprint-table">
+  <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8 modern-table">
+
+    <ng-container matColumnDef="id">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+      <td mat-cell *matCellDef="let sprint">{{ sprint.id }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
+      <td mat-cell *matCellDef="let sprint">{{ sprint.name }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="state">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>État</th>
+      <td mat-cell *matCellDef="let sprint">{{ sprint.state }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="startDate">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Début</th>
+      <td mat-cell *matCellDef="let sprint">{{ sprint.startDate | date }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="endDate">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Fin</th>
+      <td mat-cell *matCellDef="let sprint">{{ sprint.endDate | date }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="action">
+      <th mat-header-cell *matHeaderCellDef>Actions</th>
+      <td mat-cell *matCellDef="let sprint" class="action-buttons">
+        <button mat-raised-button color="primary" (click)="openBurnUp(sprint)">
+          <mat-icon>visibility</mat-icon> voir
+        </button>
+        <button mat-stroked-button color="primary" (click)="openCapacityView(6, sprint.id)">
+          <mat-icon>visibility</mat-icon> Capacité dev
+        </button>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="scope">
+      <th mat-header-cell *matHeaderCellDef>Scope</th>
+      <td mat-cell *matCellDef="let sprint">
+        <button mat-raised-button color="accent" (click)="toggleScope(sprint)">
+          <mat-icon>list_alt</mat-icon> tickets
+        </button>
+      </td>
+    </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+  </table>
+
+  <mat-paginator [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons></mat-paginator>
+</div>
+
+<!-- Burnup Chart sous le tableau -->
+<div
+  *ngIf="selectedSprintId && selectedSprintName"
+  style="margin-top: 5px; display: flex; flex-direction: column; align-items: center;">
+ <h4 style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+    <span>Burn-up du sprint : {{ selectedSprintName }}</span>
+    <button mat-icon-button color="warn" (click)="closeBurnUp()" title="Fermer">
+      <mat-icon>close</mat-icon>
+    </button>
+  </h4>
+    <div style="width: 100%; max-width: 1500px;">
+        <app-burnup-chart
+        [sprintId]="selectedSprintId"
+        [sprintName]="selectedSprintName"
+        [sprint]="selectedSprint"
+        style="display: block; width: 100%;">
+        </app-burnup-chart>
+    </div>
+  </div>
+
+  <!-- Sprint Scope affiché sous le tableau -->
+<div
+  *ngIf="selectedScopeSprintId && selectedScopeSprintName"
+  style="margin-top: 20px; display: flex; flex-direction: column; align-items: center;">
+  <h4 style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+    <span>Scope du sprint : {{ selectedScopeSprintName }}</span>
+    <button mat-icon-button color="warn" (click)="closeScope()" title="Fermer">
+      <mat-icon>close</mat-icon>
+    </button>
+  </h4>
+  <div style="width: 100%; max-width: 1500px;">
+    <app-sprint-scope
+      [sprintId]="selectedScopeSprintId"
+      style="display: block; width: 100%;">
+    </app-sprint-scope>
+  </div>
+</div>

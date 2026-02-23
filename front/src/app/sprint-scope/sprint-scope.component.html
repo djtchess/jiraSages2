@@ -1,0 +1,137 @@
+<div class="kpi-container">
+<mat-card *ngIf="sprintInfo?.sprintKpiInfo as kpis" class="kpi-card">
+  <div class="kpi-header">
+    <h3>Indicateurs du Sprint</h3>
+    <div class="kpi-toggle-buttons">
+      <button mat-button color="primary" (click)="showCommittedByType = !showCommittedByType">
+        <mat-icon>{{ showCommittedByType ? 'visibility_off' : 'visibility' }}</mat-icon>
+        {{ showCommittedByType ? 'Masquer' : 'Afficher' }} engagés
+      </button>
+      <button mat-button color="accent" (click)="showAddedByType = !showAddedByType">
+        <mat-icon>{{ showAddedByType ? 'visibility_off' : 'visibility' }}</mat-icon>
+        {{ showAddedByType ? 'Masquer' : 'Afficher' }} ajoutés
+      </button>
+      <button mat-button color="warn" (click)="showTotalByType = !showTotalByType">
+        <mat-icon>{{ showTotalByType ? 'visibility_off' : 'visibility' }}</mat-icon>
+        {{ showTotalByType ? 'Masquer' : 'Afficher' }} total
+      </button>
+    </div>
+  </div>
+
+  <div class="export-actions" style="margin:8px 0 16px; display:flex; gap:8px; flex-wrap:wrap;">
+  <button mat-stroked-button color="primary" (click)="exportToPptx()">Exporter en PowerPoint</button>
+  <button mat-stroked-button color="primary" (click)="exportToPptxWithKpiScreenshot()">
+  Exporter en PowerPoint (capture tableaux)
+</button>
+<button mat-stroked-button color="primary" (click)="downloadKpiTablesPng()">
+  Télécharger l'image (tableaux)
+</button>
+
+</div>
+
+  <div class="kpi-main-layout">
+    <!-- Tableau principal à gauche -->
+    <table class="kpi-summary-table">
+      <tr><td>ratio points prévus / total</td><td [ngClass]="getKpiClass(((kpis.pointsCommited+kpis.pointsAdded-kpis.pointsRemoved)/kpis.pointsCommited)*100)">
+        {{ ((kpis.pointsCommited + kpis.pointsAdded - kpis.pointsRemoved)/kpis.pointsCommited)*100 | number:'1.0-1' }} %</td></tr>
+      <tr><td>Engagement début de sprint respecté</td><td [ngClass]="getKpiClass(kpis.engagementRespectePourcent)">{{ kpis.engagementRespectePourcent | number:'1.0-1' }} %</td></tr>
+      <tr><td>Engagement début de sprint non terminé</td><td [ngClass]="getKpiClass(kpis.nonTerminesEngagesPourcent)">{{ kpis.nonTerminesEngagesPourcent | number:'1.0-1' }} %</td></tr>
+      <tr><td>Ajouts non prévus</td><td [ngClass]="getKpiClass(kpis.ajoutsNonPrevusPourcent)">{{ kpis.ajoutsNonPrevusPourcent | number:'1.0-1' }} %</td></tr>
+      <tr><td>Succès global (début + ajout)</td><td [ngClass]="getKpiClass(kpis.succesGlobalPourcent)">{{ kpis.succesGlobalPourcent | number:'1.0-1' }} %</td></tr>
+      <tr><td>Tickets / points engagés</td><td>{{ kpis.committedAtStart }} / {{ kpis.pointsCommited }}</td></tr>
+      <tr><td>Tickets / points ajoutés</td><td>{{ kpis.addedDuring }} / {{ kpis.pointsAdded }}</td></tr>
+      <tr><td>Tickets / points retirés</td><td>{{ kpis.removedDuring }} / {{ kpis.pointsRemoved }}</td></tr>
+      <tr><td>Tickets terminés</td><td>{{ kpis.doneTickets }}</td></tr>
+      <tr><td>Dev terminés avant le sprint</td><td>{{ kpis.devDoneBeforeSprint }}</td></tr>
+    </table>
+
+    <!-- Colonnes des blocs par type à droite -->
+    <div class="kpi-type-columns">
+      <!-- Tickets engagés -->
+      <div class="kpi-block" *ngIf="showCommittedByType">
+        <h4>Engagés</h4>
+        <table class="kpi-table">
+          <thead><tr><th>Type</th><th>nb tickets</th><th>story points</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let entry of kpis?.typeCountCommitted | keyvalue">
+              <td>{{ entry.key }}</td><td>{{ entry.value.nbTickets }}</td><td>{{ entry.value.nbStoryPoints }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tickets ajoutés -->
+      <div class="kpi-block" *ngIf="showAddedByType">
+        <h4>Ajoutés</h4>
+        <table class="kpi-table">
+          <thead><tr><th>Type</th><th>nb tickets</th><th>story points</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let entry of kpis?.typeCountAdded | keyvalue">
+              <td>{{ entry.key }}</td><td>{{ entry.value.nbTickets }}</td><td>{{ entry.value.nbStoryPoints }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Total -->
+      <div class="kpi-block" *ngIf="showTotalByType">
+        <h4>Total</h4>
+        <table class="kpi-table">
+          <thead><tr><th>Type</th><th>nb tickets</th><th>story points</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let entry of kpis?.typeCountAll | keyvalue">
+              <td>{{ entry.key }}</td><td>{{ entry.value.nbTickets }}</td><td>{{ entry.value.nbStoryPoints }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</mat-card>
+
+<div class="kpi-chart-container">
+  <div *ngIf="kpiChartOptions" class="kpi-chart-box">
+    <echarts
+      [options]="kpiChartOptions"
+      (chartInit)="onChartInit('kpi', $event)"></echarts>
+  </div>
+  <div *ngIf="ticketTypeChartOptions" class="kpi-chart-box">
+    <echarts
+      [options]="ticketTypeChartOptions"
+      (chartInit)="onChartInit('typeSp', $event)">
+    </echarts>
+  </div>
+    <div *ngIf="ticketNbTypeChartOptions" class="kpi-chart-box">
+    <echarts
+      [options]="ticketNbTypeChartOptions" 
+      (chartInit)="onChartInit('typeNb', $event)">
+    </echarts>
+  </div>
+</div>
+
+    
+</div>
+<ng-container *ngIf="!sprintInfo">
+  <p style="text-align: center;">Chargement des données du sprint...</p>
+</ng-container>
+<br/>
+
+<div class="export-actions" style="margin:8px 0 16px; display:flex; gap:8px; flex-wrap:wrap;">
+  <button mat-stroked-button color="primary" (click)="exportAllToHtml()">Exporter en HTML</button>
+  <button mat-stroked-button color="primary" (click)="exportAllToXlsx()">Exporter en XLSX</button>
+  <button mat-stroked-button color="primary" (click)="exportAllToPdf()">Exporter en PDF</button>
+</div>
+
+
+<div *ngIf="sprintInfo?.sprintCommitInfo as commitInfo">
+  <h2>Tickets engagés au début</h2>
+  <app-ticket-table [tickets]="commitInfo.committedAtStart || []"></app-ticket-table>
+
+  <h2>Ajoutés en cours de sprint</h2>
+  <app-ticket-table [tickets]="commitInfo.addedDuring || []"></app-ticket-table>
+
+  <h2>Retirés en cours de sprint</h2>
+  <app-ticket-table [tickets]="commitInfo.removedDuring || []"></app-ticket-table>
+
+</div>

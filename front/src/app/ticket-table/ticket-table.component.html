@@ -1,0 +1,75 @@
+<div class="ticket-table-container">
+  <mat-form-field appearance="outline">
+    <mat-label>Filtrer les tickets</mat-label>
+    <input matInput (input)="applyFilter($event)" placeholder="Ex: status, assigné, type…" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+  
+
+  <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
+
+    <!-- Ticket Key -->
+    <ng-container matColumnDef="ticketKey">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Clé</th>
+      <td mat-cell *matCellDef="let ticket"><a [href]="ticket.url" target="_blank" rel="noopener noreferrer"><mat-icon inline>open_in_new</mat-icon> {{ ticket.ticketKey }}</a>
+</td>
+
+    </ng-container>
+
+    <!-- Assignee -->
+    <ng-container matColumnDef="assignee">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Assigné</th>
+      <td mat-cell *matCellDef="let ticket">{{ ticket.assignee }}</td>
+    </ng-container>
+
+    <!-- Status -->
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+      <td mat-cell *matCellDef="let ticket">
+        <!-- <mat-icon aria-hidden="true">{{ getStatusIcon(ticket.status) }}</mat-icon> -->
+        {{ ticket.status }}
+      </td>
+    </ng-container>
+
+    <!-- Story Points -->
+    <ng-container matColumnDef="storyPoints">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Pts</th>
+      <td mat-cell *matCellDef="let ticket">{{ ticket.storyPoints }}</td>
+    </ng-container>
+
+        <!-- Story Points -->
+    <ng-container matColumnDef="storyPointsRealiseAvantSprint">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Pts réalisés avant sprint</th>
+      <td mat-cell *matCellDef="let ticket">{{ ticket.storyPointsRealiseAvantSprint }}</td>
+    </ng-container>
+
+    <!-- Type -->
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+      <td mat-cell *matCellDef="let ticket">
+        <mat-icon aria-hidden="true">{{ getTypeIcon(ticket.type) }}</mat-icon>
+        <!-- <mat-icon [color]="getTypeColor(ticket.type)">  {{ getTypeIcon(ticket.type) }} </mat-icon> -->
+        {{ ticket.type }}
+      </td>
+    </ng-container>
+
+        <!-- Date Création -->
+    <ng-container matColumnDef="versionCorrigee">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>version corrigées</th>
+      <td mat-cell *matCellDef="let ticket">{{ ticket.versionCorrigee}}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="done">
+        <th mat-header-cell *matHeaderCellDef>Terminé</th>
+        <td mat-cell *matCellDef="let ticket">
+            <mat-icon [color]="isTicketDone(ticket) ? 'primary' : 'warn'">
+            {{ isTicketDone(ticket) ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+        </td>
+    </ng-container>
+
+    <!-- Rows -->
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+</div>

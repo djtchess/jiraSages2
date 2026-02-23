@@ -1,0 +1,46 @@
+<div>
+  <button mat-button (click)="back()">
+    <mat-icon>arrow_back</mat-icon> Retour
+  </button>
+  <h2>Capacité développeurs — Sprint {{ sprintId }}</h2>
+</div>
+
+<div *ngIf="isLoading" class="loading">
+  <mat-spinner diameter="40"></mat-spinner>
+</div>
+
+<table *ngIf="!isLoading" mat-table [dataSource]="data" class="mat-elevation-z2 fullwidth">
+
+  <ng-container matColumnDef="prenom">
+    <th mat-header-cell *matHeaderCellDef> Prénom </th>
+    <td mat-cell *matCellDef="let row">{{ row.prenom }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="capaciteNouveauSprint">
+    <th mat-header-cell *matHeaderCellDef> Capacité brute </th>
+    <td mat-cell *matCellDef="let row">{{ row.capaciteNouveauSprint | number:'1.0-2' }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="resteAFaireSprintPrecedent">
+    <th mat-header-cell *matHeaderCellDef> Reste à faire (N-1) </th>
+    <td mat-cell *matCellDef="let row">{{ row.resteAFaireSprintPrecedent | number:'1.0-2' }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="capaciteNette">
+    <th mat-header-cell *matHeaderCellDef> Capacité nette </th>
+    <td mat-cell *matCellDef="let row"><b>{{ row.capaciteNette | number:'1.0-2' }}</b></td>
+  </ng-container>
+
+  <ng-container matColumnDef="ticketsRestantsKeys">
+    <th mat-header-cell *matHeaderCellDef> Tickets restants </th>
+    <td mat-cell *matCellDef="let row">
+      <mat-chip-listbox *ngIf="row.ticketsRestantsKeys?.length">
+        <mat-chip *ngFor="let k of row.ticketsRestantsKeys">{{ k }}</mat-chip>
+      </mat-chip-listbox>
+      <span *ngIf="!row.ticketsRestantsKeys?.length">—</span>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>

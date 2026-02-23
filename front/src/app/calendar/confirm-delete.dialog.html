@@ -1,0 +1,10 @@
+<!-- confirm-delete.dialog.html -->
+<h2 mat-dialog-title>Supprimer l'événement ?</h2>
+<mat-dialog-content>
+  <p>Êtes-vous sûr de vouloir supprimer cet événement pour {{ data.resource }} du
+    {{ data.start | date:'dd/MM/yyyy' }} au {{ data.end | date:'dd/MM/yyyy' }} ?</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Annuler</button>
+  <button mat-raised-button color="warn" [mat-dialog-close]="true">Supprimer</button>
+</mat-dialog-actions>
