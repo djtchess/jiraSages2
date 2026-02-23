@@ -23,6 +23,8 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -60,6 +62,8 @@ import fr.agile.dto.SprintVersionEpicDurationDTO;
 
 @Component
 public class JiraApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(JiraApiClient.class);
 
     @Value("${jira.baseUrl}")
     private String JIRA_URL;
@@ -506,9 +510,13 @@ public class JiraApiClient {
         Map<Long, SprintInfoDTO> sprintById = new HashMap<>();
 
         for (BoardInfo board : boards) {
-            List<SprintInfoDTO> boardSprints = getAllSprintsForBoard(board.getId());
-            for (SprintInfoDTO sprint : boardSprints) {
-                sprintById.put(sprint.getId(), sprint);
+            try {
+                List<SprintInfoDTO> boardSprints = getAllSprintsForBoard(board.getId());
+                for (SprintInfoDTO sprint : boardSprints) {
+                    sprintById.put(sprint.getId(), sprint);
+                }
+            } catch (Exception ex) {
+                log.warn("Board {} ({}) ignoré pour l'agrégation des épics : {}", board.getId(), board.getName(), ex.getMessage());
             }
         }
 
