@@ -533,21 +533,23 @@ public class JiraApiClient {
             String epicSummary = fields.path("summary").asText("Sans résumé");
             String status = fields.path("status").path("name").asText("Inconnu");
 
-            List<String> versions = new ArrayList<>();
-            JsonNode fixVersions = fields.path("fixVersions");
-            if (fixVersions.isArray()) {
-                for (JsonNode v : fixVersions) {
-                    String name = v.path("name").asText(null);
-                    if (name != null && !name.isBlank()) {
-                        versions.add(name);
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("customfield_10020", "fixVersions"));
+
+            Set<String> versionSet = new TreeSet<>();
+            for (JsonNode childIssue : childIssues) {
+                JsonNode fixVersions = childIssue.path("fields").path("fixVersions");
+                if (fixVersions.isArray()) {
+                    for (JsonNode versionNode : fixVersions) {
+                        String name = versionNode.path("name").asText(null);
+                        if (name != null && !name.isBlank()) {
+                            versionSet.add(name);
+                        }
                     }
                 }
             }
-            if (versions.isEmpty()) {
-                versions = List.of("Sans version");
-            }
+            List<String> versions = versionSet.isEmpty() ? List.of("Sans version") : new ArrayList<>(versionSet);
 
-            Set<Long> sprintIds = getSprintIdsForEpicFromChildren(projectKey, epicKey);
+            Set<Long> sprintIds = extractSprintIdsFromIssues(childIssues);
             List<EpicSprintDTO> deliveries = sprintIds.stream()
                     .map(id -> {
                         SprintInfoDTO sprint = sprintById.get(id);
@@ -645,16 +647,21 @@ public class JiraApiClient {
     }
 
     private Set<Long> getSprintIdsForEpicFromChildren(String projectKey, String epicKey) throws Exception {
-        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"", projectKey, epicKey);
-        List<JsonNode> childIssues;
+        List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("customfield_10020"));
+        return extractSprintIdsFromIssues(childIssues);
+    }
 
+    private List<JsonNode> getChildIssuesForEpic(String projectKey, String epicKey, List<String> fields) throws Exception {
+        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"", projectKey, epicKey);
         try {
-            childIssues = searchIssuesByJql(epicLinkJql, List.of("customfield_10020"));
+            return searchIssuesByJql(epicLinkJql, fields);
         } catch (Exception ex) {
             String parentJql = String.format("project = %s AND parent = \"%s\"", projectKey, epicKey);
-            childIssues = searchIssuesByJql(parentJql, List.of("customfield_10020"));
+            return searchIssuesByJql(parentJql, fields);
         }
+    }
 
+    private Set<Long> extractSprintIdsFromIssues(List<JsonNode> childIssues) {
         Set<Long> sprintIds = new TreeSet<>();
         for (JsonNode childIssue : childIssues) {
             JsonNode sprintField = childIssue.path("fields").path("customfield_10020");

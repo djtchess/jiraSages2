@@ -1,5 +1,6 @@
 import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { EChartsOption } from 'echarts';
@@ -11,7 +12,7 @@ import { EpicDeliveryOverview } from '../../model/epic-duration.model';
 @Component({
   selector: 'app-epic-duration-chart',
   standalone: true,
-  imports: [CommonModule, NgxEchartsModule, MatTableModule, MatProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, NgxEchartsModule, MatTableModule, MatProgressSpinnerModule],
   providers: [
     {
       provide: NGX_ECHARTS_CONFIG,
@@ -26,6 +27,12 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
 
   isLoading = false;
   data: EpicDeliveryOverview[] = [];
+  filteredData: EpicDeliveryOverview[] = [];
+  allVersions: string[] = [];
+  allSprints: string[] = [];
+  selectedVersions: string[] = [];
+  selectedSprints: string[] = [];
+
   displayedColumns: string[] = ['epicKey', 'epicSummary', 'status', 'versions', 'sprints'];
   chartOptions: EChartsOption = {};
 
@@ -46,15 +53,34 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     this.jiraService.getEpicDeliveries(this.projectKey).subscribe({
       next: (rows) => {
         this.data = rows;
-        this.buildChart(rows);
+        this.allVersions = Array.from(new Set(rows.flatMap(r => r.versionNames))).sort((a, b) => a.localeCompare(b));
+        this.allSprints = Array.from(new Set(rows.flatMap(r => r.sprintDeliveries.map(s => s.sprintName)))).sort((a, b) => a.localeCompare(b));
+        this.applyFilters();
         this.isLoading = false;
       },
       error: () => {
         this.data = [];
+        this.filteredData = [];
         this.chartOptions = {};
         this.isLoading = false;
       }
     });
+  }
+
+  applyFilters(): void {
+    this.filteredData = this.data.filter(row => {
+      const versionOk = this.selectedVersions.length === 0 || row.versionNames.some(v => this.selectedVersions.includes(v));
+      const sprintNames = row.sprintDeliveries.map(s => s.sprintName);
+      const sprintOk = this.selectedSprints.length === 0 || sprintNames.some(s => this.selectedSprints.includes(s));
+      return versionOk && sprintOk;
+    });
+    this.buildChart(this.filteredData);
+  }
+
+  resetFilters(): void {
+    this.selectedVersions = [];
+    this.selectedSprints = [];
+    this.applyFilters();
   }
 
   formatVersions(row: EpicDeliveryOverview): string {
@@ -80,7 +106,7 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
           const versions = epic?.versionNames?.join(', ') ?? 'Sans version';
           const sprints = epic?.sprintDeliveries?.map(s => s.sprintName).join(' / ') ?? '-';
           const lines = (params as any[]).map(p => `${p.marker} ${p.seriesName}: <b>${p.value}</b>`).join('<br/>');
-          return `<b>${epic?.epicKey ?? ''}</b><br/>${lines}<br/>Versions: <b>${versions}</b><br/>Sprints: <b>${sprints}</b>`;
+          return `<b>${epic?.epicKey ?? ''}</b><br/>${lines}<br/>Versions tickets enfants: <b>${versions}</b><br/>Sprints: <b>${sprints}</b>`;
         }
       },
       legend: { data: ['Nb sprints', 'Nb versions'] },
@@ -88,8 +114,8 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
       xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35 } },
       yAxis: { type: 'value', name: 'Nombre' },
       series: [
-        { name: 'Nb sprints', type: 'bar', data: sprintCount },
-        { name: 'Nb versions', type: 'bar', data: versionCount }
+        { name: 'Nb sprints', type: 'bar', data: sprintCount, itemStyle: { color: '#1976d2' } },
+        { name: 'Nb versions', type: 'bar', data: versionCount, itemStyle: { color: '#7b1fa2' } }
       ]
     };
   }
