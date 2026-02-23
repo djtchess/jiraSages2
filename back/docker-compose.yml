@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  backend:
+    build: ./back
+    ports:
+      - "8088:8088"
+    environment:
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=admin
+      - DB_URL=jdbc:postgresql://db:5432/agile
+      - DB_DRIVER=org.postgresql.Driver
+      - JIRA_BASE_URL=https://sages2-cpam.atlassian.net
+      - JIRA_USERNAME=ton.email@domaine.fr
+      - JIRA_API_TOKEN=ton_token_jira
+    depends_on:
+      - db
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: agile
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  frontend:
+    build: ./front
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+volumes:
+  db_data:

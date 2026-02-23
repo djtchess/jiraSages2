@@ -121,6 +121,7 @@ public class JiraApiClient {
      */
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(20))
+//            .proxy(ProxySelector.of(new InetSocketAddress("proxy-internet.cen.cnamts.fr", 3128)))
             .proxy(ProxySelector.of(new InetSocketAddress("proxy-web.cnamts.fr", 3128)))
             .build();
 
@@ -1011,6 +1012,9 @@ public class JiraApiClient {
             "Analyse technique", "Bug", "Story", "Task", "Tâche DevOps", "Tâche Enovacom",
             "Tâche Technique", "feature", "Sub-task", "sub task Enovacom",
             "tâche environnement de travail", "Document", "Affinage fonctionnel");
+
+    private static final List<String> LISTE_TYPES_STORY = List.of(
+            "Story");
 
     private static final List<String> LISTE_STATUTS_COMPLETS = List.of(
             "TACHE TECHNIQUE TESTEE", "A FAIRE", "A VALIDER", "DEV TERMINE", "FAIT",

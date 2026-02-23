@@ -45,7 +45,7 @@ public class JiraController {
     }
 
     @GetMapping(value ="/projects/{projectKey}/sprints", produces = "application/json")
-    public ResponseEntity<List<SprintInfoDTO>> getSprintsForProject(@PathVariable String projectKey) {
+    public ResponseEntity<List<SprintInfoDTO>> getSprintsForProject(@PathVariable String projectKey) throws Exception {
         log.info("Récupération des sprints pour le projet {}", projectKey);
         List<SprintInfoDTO> sprints = jiraApiClient.getAllSprintsForBoard(6);
 
