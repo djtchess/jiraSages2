@@ -1,14 +1,7 @@
 package fr.agile;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ProxySelector;
-import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,7 +11,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -55,6 +47,7 @@ import fr.agile.entities.SprintInfo;
 import fr.agile.model.dto.Ticket;
 import fr.agile.service.DevelopperService;
 import fr.agile.service.EventService;
+import fr.agile.service.JiraHttpClient;
 import fr.agile.service.JoursFeriesService;
 import fr.agile.service.SprintService;
 import fr.agile.sprint.SprintCapacityCalculator;
@@ -102,28 +95,22 @@ public class JiraApiClient {
     @Autowired
     private SprintCapacityCalculator calculator;
 
+    private final JiraHttpClient jiraHttpClient;
     private final Map<String, IssueChangelogData> changelogCache = new ConcurrentHashMap<>();
 
     public JiraApiClient(SprintService sprintService,
                          DevelopperService developpeurService,
                          EventService evenementService,
                          JoursFeriesService joursFeriesService,
-                         SprintCapacityCalculator calculator) {
+                         SprintCapacityCalculator calculator,
+                         JiraHttpClient jiraHttpClient) {
         this.developpeurService = developpeurService;
         this.evenementService = evenementService;
         this.joursFeriesService = joursFeriesService;
         this.calculator = calculator;
         this.sprintService = sprintService;
+        this.jiraHttpClient = jiraHttpClient;
     }
-
-    /**
-     * HttpClient unique (proxy + timeouts)
-     */
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(20))
-//            .proxy(ProxySelector.of(new InetSocketAddress("proxy-internet.cen.cnamts.fr", 3128)))
-            .proxy(ProxySelector.of(new InetSocketAddress("proxy-web.cnamts.fr", 3128)))
-            .build();
 
     // =====================================================================
     // Requêtes JQL
@@ -167,8 +154,8 @@ public class JiraApiClient {
                     .add("customfield_10020")   // sprint(s)
                     .add("customfield_10242");  // engagement sprint ? (si présent)
 
-            HttpRequest request = createPostJsonRequest(urlString, body.toString());
-            String response = sendRequest(request);
+            HttpRequest request = jiraHttpClient.createPostJsonRequest(urlString, body.toString());
+            String response = jiraHttpClient.sendRequest(request);
 
             JsonNode rootNode = mapper.readTree(response);
             JsonNode issuesNode = rootNode.path("issues");
@@ -293,8 +280,8 @@ public class JiraApiClient {
 
         while (hasMore) {
             String url = JIRA_URL + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt + "&maxResults=" + maxResults;
-            HttpRequest request = createRequest(url);
-            String body = sendRequest(request);
+            HttpRequest request = jiraHttpClient.createRequest(url);
+            String body = jiraHttpClient.sendRequest(request);
 
             JsonNode root = mapper.readTree(body);
             // L’endpoint /changelog retourne "values"
@@ -612,8 +599,8 @@ public class JiraApiClient {
     // =====================================================================
     public SprintInfoDTO getSprintInfo(String sprintId) throws Exception {
         String urlString = JIRA_URL + "/rest/agile/1.0/sprint/" + sprintId;
-        HttpRequest request = createRequest(urlString);
-        String response = sendRequest(request);
+        HttpRequest request = jiraHttpClient.createRequest(urlString);
+        String response = jiraHttpClient.sendRequest(request);
         JsonNode sprintNode = mapper.readTree(response);
 
         String state = sprintNode.path("state").asText();
@@ -695,8 +682,8 @@ public class JiraApiClient {
 
         while (!isLast) {
             String urlString = JIRA_URL + "/rest/agile/1.0/board?projectKeyOrId=" + projectKey + "&startAt=" + startAt + "&maxResults=" + maxResults;
-            HttpRequest request = createRequest(urlString);
-            String response = sendRequest(request);
+            HttpRequest request = jiraHttpClient.createRequest(urlString);
+            String response = jiraHttpClient.sendRequest(request);
 
             JsonNode rootNode = mapper.readTree(response);
             JsonNode values = rootNode.path("values");
@@ -725,8 +712,8 @@ public class JiraApiClient {
         while (true) {
             String urlString = JIRA_URL + "/rest/agile/1.0/board/" + boardId
                     + "/sprint?startAt=" + startAt + "&maxResults=" + maxResults;
-            HttpRequest request = createRequest(urlString);
-            String response = sendRequest(request);
+            HttpRequest request = jiraHttpClient.createRequest(urlString);
+            String response = jiraHttpClient.sendRequest(request);
 
             JsonNode root = mapper.readTree(response);
             JsonNode values = root.path("values");
@@ -948,60 +935,6 @@ public class JiraApiClient {
             if (sprintId.equals(part)) return true;
         }
         return false;
-    }
-
-    // =====================================================================
-    // HTTP utils
-    // =====================================================================
-
-    private HttpRequest createPostJsonRequest(String url, String jsonBody) {
-        String auth = USERNAME + ":" + API_TOKEN;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Basic " + encodedAuth)
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(60))
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
-                .build();
-    }
-
-    private HttpRequest createRequest(String url) {
-        String auth = USERNAME + ":" + API_TOKEN;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Basic " + encodedAuth)
-                .header("Accept", "application/json")
-                .GET()
-                .build();
-    }
-
-    /**
-     * Envoi avec gestion simple des retries (429/5xx).
-     */
-    private String sendRequest(HttpRequest request) throws IOException, InterruptedException {
-        int attempts = 0;
-        while (true) {
-            attempts++;
-            var resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            int sc = resp.statusCode();
-            if (sc / 100 == 2) return resp.body();
-
-            boolean retryable = sc == 429 || (sc >= 500 && sc < 600);
-            if (retryable && attempts < 5) {
-                long retrySec = resp.headers().firstValue("Retry-After").map(Long::parseLong).orElse(1L);
-                long backoffMs = (long) (retrySec * 1000 + Math.pow(2, attempts - 1) * 200 + (Math.random() * 100));
-                try {
-                    Thread.sleep(backoffMs);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-                continue;
-            }
-            throw new IOException("HTTP " + sc + " for " + request.uri() + " – body: " + resp.body());
-        }
     }
 
     // =====================================================================

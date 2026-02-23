@@ -6,7 +6,9 @@ import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Optional;
 
+import fr.agile.dto.SprintInfoDTO;
 import fr.agile.entities.SprintInfo;
+import fr.agile.mapper.SprintMapper;
 import fr.agile.repository.SprintInfoRepository;
 
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +23,13 @@ public class SprintService {
 
     public SprintService(SprintInfoRepository sprintInfoRepository) {
         this.sprintInfoRepository = sprintInfoRepository;
+    }
+
+
+    @Transactional
+    public SprintInfoDTO saveSprint(SprintInfoDTO sprintInfoDTO) {
+        SprintInfo savedSprint = saveSprint(SprintMapper.toEntity(sprintInfoDTO));
+        return SprintMapper.toDTO(savedSprint);
     }
 
     @Transactional
