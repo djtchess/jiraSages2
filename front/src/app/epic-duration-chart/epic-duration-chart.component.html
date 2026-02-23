@@ -36,6 +36,10 @@
     <button class="reset-btn" (click)="resetFilters()">Réinitialiser</button>
   </div>
 
+  <div class="actions-row">
+    <button class="export-btn" (click)="exportStandaloneHtml()">Exporter une page HTML autonome</button>
+  </div>
+
   <div echarts [options]="chartOptions" class="chart"></div>
 
   <table mat-table [dataSource]="filteredData" class="mat-elevation-z2 table">

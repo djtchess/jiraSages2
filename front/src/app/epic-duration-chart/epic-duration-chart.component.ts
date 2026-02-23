@@ -83,6 +83,130 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     this.applyFilters();
   }
 
+  exportStandaloneHtml(): void {
+    const payload = {
+      projectKey: this.projectKey,
+      generatedAt: new Date().toISOString(),
+      rows: this.data
+    };
+
+    const html = `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Epics - Sprints & Versions</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; background:#f6f8ff; }
+    .kpis { display:grid; grid-template-columns:repeat(3,minmax(160px,1fr)); gap:12px; margin-bottom:12px; }
+    .card { background:#fff; border:1px solid #dce3ff; border-radius:10px; padding:12px; }
+    .label { color:#5f6b85; font-size:12px; }
+    .value { font-weight:700; font-size:20px; color:#1f2f56; }
+    .filters { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; background:#fff; border:1px solid #dce3ff; border-radius:10px; padding:12px; margin-bottom:12px; }
+    select { min-height:90px; width:100%; }
+    button { height:40px; border:none; background:#3f51b5; color:#fff; border-radius:8px; padding:0 12px; cursor:pointer; }
+    #chart { width:100%; height:480px; background:#fff; border-radius:10px; border:1px solid #dce3ff; margin-bottom:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; border:1px solid #dce3ff; }
+    th, td { border-bottom:1px solid #edf0fb; padding:8px; text-align:left; }
+    th { background:#f2f5ff; }
+  </style>
+</head>
+<body>
+  <h2>Epics livrés - Projet ${this.projectKey}</h2>
+  <div style="color:#6b7899; margin-bottom:10px;">Export généré le ${new Date().toLocaleString('fr-FR')}</div>
+  <div class="kpis">
+    <div class="card"><div class="label">Epics affichés</div><div class="value" id="kpiEpics">0</div></div>
+    <div class="card"><div class="label">Versions disponibles</div><div class="value" id="kpiVersions">0</div></div>
+    <div class="card"><div class="label">Sprints disponibles</div><div class="value" id="kpiSprints">0</div></div>
+  </div>
+  <div class="filters">
+    <div><label>Filtrer par versions</label><select id="versionFilter" multiple></select></div>
+    <div><label>Filtrer par sprints</label><select id="sprintFilter" multiple></select></div>
+    <div style="display:flex;align-items:end;"><button id="resetBtn">Réinitialiser</button></div>
+  </div>
+  <div id="chart"></div>
+  <table>
+    <thead><tr><th>Epic</th><th>Résumé</th><th>Statut</th><th>Versions (tickets enfants)</th><th>Sprints</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const raw = ${JSON.stringify(payload)};
+    let selectedVersions = [];
+    let selectedSprints = [];
+    const data = raw.rows || [];
+
+    const allVersions = [...new Set(data.flatMap(r => r.versionNames || []))].sort();
+    const allSprints = [...new Set(data.flatMap(r => (r.sprintDeliveries || []).map(s => s.sprintName)))].sort();
+
+    const versionFilter = document.getElementById('versionFilter');
+    const sprintFilter = document.getElementById('sprintFilter');
+    allVersions.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; versionFilter.appendChild(o); });
+    allSprints.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sprintFilter.appendChild(o); });
+
+    const chart = echarts.init(document.getElementById('chart'));
+
+    function getFiltered() {
+      return data.filter(r => {
+        const versionOk = selectedVersions.length === 0 || (r.versionNames || []).some(v => selectedVersions.includes(v));
+        const sprints = (r.sprintDeliveries || []).map(s => s.sprintName);
+        const sprintOk = selectedSprints.length === 0 || sprints.some(s => selectedSprints.includes(s));
+        return versionOk && sprintOk;
+      });
+    }
+
+    function render() {
+      const rows = getFiltered();
+      document.getElementById('kpiEpics').textContent = String(rows.length);
+      document.getElementById('kpiVersions').textContent = String(allVersions.length);
+      document.getElementById('kpiSprints').textContent = String(allSprints.length);
+
+      const tbody = document.getElementById('rows');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+r.epicKey+'</td><td>'+r.epicSummary+'</td><td>'+r.status+'</td><td>'+(r.versionNames||[]).join(', ')+'</td><td>'+(r.sprintDeliveries||[]).map(s=>s.sprintName).join(' / ')+'</td>';
+        tbody.appendChild(tr);
+      });
+
+      chart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { data: ['Nb sprints', 'Nb versions'] },
+        xAxis: { type: 'category', data: rows.map(r => r.epicKey), axisLabel: { rotate: 35 } },
+        yAxis: { type: 'value' },
+        series: [
+          { name: 'Nb sprints', type: 'bar', data: rows.map(r => (r.sprintDeliveries||[]).length) },
+          { name: 'Nb versions', type: 'bar', data: rows.map(r => (r.versionNames||[]).length) }
+        ]
+      });
+    }
+
+    versionFilter.addEventListener('change', () => { selectedVersions = Array.from(versionFilter.selectedOptions).map(o => o.value); render(); });
+    sprintFilter.addEventListener('change', () => { selectedSprints = Array.from(sprintFilter.selectedOptions).map(o => o.value); render(); });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      selectedVersions = []; selectedSprints = [];
+      Array.from(versionFilter.options).forEach(o => o.selected = false);
+      Array.from(sprintFilter.options).forEach(o => o.selected = false);
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `epic-delivery-${this.projectKey}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   formatVersions(row: EpicDeliveryOverview): string {
     return row.versionNames.join(', ');
   }
