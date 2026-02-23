@@ -45,6 +45,7 @@ import fr.agile.service.ChangelogCacheService;
 import fr.agile.service.JiraHttpClient;
 import fr.agile.service.JiraParser;
 import fr.agile.service.JoursFeriesService;
+import fr.agile.service.JiraSprintAnalysisService;
 import fr.agile.service.SprintService;
 import fr.agile.sprint.SprintCapacityCalculator;
 import fr.agile.utils.BurnupUtils;
@@ -76,6 +77,7 @@ public class JiraApiClient {
     private final JiraHttpClient jiraHttpClient;
     private final JiraParser jiraParser;
     private final ChangelogCacheService changelogCacheService;
+    private final JiraSprintAnalysisService jiraSprintAnalysisService;
 
     public JiraApiClient(SprintService sprintService,
                          DevelopperService developpeurService,
@@ -84,7 +86,8 @@ public class JiraApiClient {
                          SprintCapacityCalculator calculator,
                          JiraHttpClient jiraHttpClient,
                          JiraParser jiraParser,
-                         ChangelogCacheService changelogCacheService) {
+                         ChangelogCacheService changelogCacheService,
+                         JiraSprintAnalysisService jiraSprintAnalysisService) {
         this.developpeurService = developpeurService;
         this.evenementService = evenementService;
         this.joursFeriesService = joursFeriesService;
@@ -93,6 +96,7 @@ public class JiraApiClient {
         this.jiraHttpClient = jiraHttpClient;
         this.jiraParser = jiraParser;
         this.changelogCacheService = changelogCacheService;
+        this.jiraSprintAnalysisService = jiraSprintAnalysisService;
     }
 
     // =====================================================================
@@ -129,7 +133,7 @@ public class JiraApiClient {
                 if (ticketDevAvantSprint) {
                     try {
                         IssueChangelogData ch = getChangelogCached(key);
-                        devAvantSprint = isDevTermineAvantSprintFromData(ch, sprintStartDate);
+                        devAvantSprint = jiraSprintAnalysisService.isDevTermineAvantSprint(ch, sprintStartDate);
                     } catch (Exception e) {
                         devAvantSprint = false; // ne filtre pas si erreur changelog
                     }
@@ -210,21 +214,6 @@ public class JiraApiClient {
     // Aide "dev terminé avant le sprint"
     // =====================================================================
 
-    /**
-     * Version basée sur IssueChangelogData (évite de reparser des JsonNode bruts).
-     */
-    private boolean isDevTermineAvantSprintFromData(IssueChangelogData cd, ZonedDateTime sprintStart) {
-        if (cd == null) return false;
-        Set<String> validStatuses = Set.of("DEV TERMINE", "INTEGRATION PR", "PAIR REVIEW", "READY TO DEMO");
-        // on exploite statusParDate (clé = LocalDateTime)
-        for (Map.Entry<LocalDateTime, String> e : cd.getStatutAvantDateMap().entrySet()) {
-            ZonedDateTime when = e.getKey().atZone(Z_PARIS);
-            String to = e.getValue() == null ? "" : e.getValue().toUpperCase();
-            if (validStatuses.contains(to) && when.isBefore(sprintStart)) return true;
-        }
-        return false;
-    }
-
     // Ancienne version (si jamais tu passes encore un JsonNode brut)
     public boolean isDevTermineAvantSprint(JsonNode changelog, ZonedDateTime sprintStart) {
         Set<String> validStatuses = Set.of("DEV TERMINE", "INTEGRATION PR", "PAIR REVIEW", "READY TO DEMO");
@@ -285,7 +274,7 @@ public class JiraApiClient {
             if (ticket.getStoryPoints() == null) {
                 ticket.setStoryPoints(0.0);
             }
-            Double val = calculateAvancementAvantSprint(changelogData, ticket.getStoryPoints(), dateDebut);
+            Double val = jiraSprintAnalysisService.calculateAvancementAvantSprint(changelogData, ticket.getStoryPoints(), dateDebut);
             avanceAvantSprint += val;
             totalStoryPoints += ticket.getStoryPoints();
             double avancemeent = ticket.getAvancement() != null ? ticket.getAvancement() : 0.0;
@@ -330,31 +319,6 @@ public class JiraApiClient {
         System.out.println("totalStoryPoints : "+totalStoryPoints);
         BurnupDataDTO burnupData = new BurnupDataDTO(result, totalStoryPoints);
         return burnupData;
-    }
-
-    // Calcul de l'avancement avant le sprint
-    private double calculateAvancementAvantSprint(IssueChangelogData changelogData, double sp, ZonedDateTime dateDebut) {
-        double lastAvancementAvantSprint = 0.0;
-        String statutAvant = changelogData.getLastStatusBefore(dateDebut);
-        Set<String> statutsValides = Set.of("ON GOING", "PAIR REVIEW", "READY TO DEMO", "INTEGRATION PR", "DEV TERMINE");
-
-        if (statutAvant != null && statutsValides.contains(statutAvant.toUpperCase())) {
-            for (AvancementHistorique a : changelogData.getAvancementHistorique()) {
-                ZonedDateTime date = BurnupUtils.parseZonedDateTime(a.getDate());
-
-                if (date.isBefore(dateDebut) && a.getTo() != null && !a.getTo().isBlank()) {
-                    try {
-                        double avancement = Double.parseDouble(a.getTo());
-                        if (avancement > lastAvancementAvantSprint) {
-                            lastAvancementAvantSprint = avancement;
-                        }
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-            lastAvancementAvantSprint = BurnupUtils.roundToTwoDecimals(sp * (lastAvancementAvantSprint / 100.0));
-        }
-        return lastAvancementAvantSprint;
     }
 
     // Accumule les avancements journaliers dans dailyDone
@@ -553,7 +517,10 @@ public class JiraApiClient {
         Set<Ticket> tickets = collectTicketsForSprintAnalysis(sprintId, sprintStart, sprintEnd);
         System.out.println("collectTicketsForSprintAnalysis terminée");
 
-        return classifyTicketsByChangelog(tickets, sprintId, sprintStart, sprintEnd);
+        JiraSprintAnalysisService.SprintCommitBuckets buckets =
+                jiraSprintAnalysisService.classifyTicketsByChangelog(tickets, sprintId, sprintStart, sprintEnd, this::getChangelogCached);
+
+        return new SprintCommitInfo(buckets.committedAtStart(), buckets.addedDuring(), buckets.removedDuring());
     }
 
     private Set<Ticket> collectTicketsForSprintAnalysis(String sprintId, ZonedDateTime sprintStart, ZonedDateTime sprintEnd) throws Exception {
@@ -562,106 +529,6 @@ public class JiraApiClient {
 
         return Stream.concat(inWindow.stream(), stillIn.stream())
                 .collect(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(Ticket::getTicketKey))));
-    }
-
-    private SprintCommitInfo classifyTicketsByChangelog(
-            Set<Ticket> tickets,
-            String sprintId,
-            ZonedDateTime sprintStart,
-            ZonedDateTime sprintEnd) throws Exception {
-
-        List<Ticket> committed = new ArrayList<>();
-        List<Ticket> added = new ArrayList<>();
-        List<Ticket> removed = new ArrayList<>();
-
-
-        for (Ticket ticket : tickets) {
-            IssueChangelogData cd = getChangelogCached(ticket.getTicketKey());
-            ticket.setChangelog(cd);
-            if (ticket.getStoryPoints() == null) {
-                ticket.setStoryPoints(0.0);
-            }
-            ticket.setStoryPointsRealiseAvantSprint(
-                    calculateAvancementAvantSprint(cd, ticket.getStoryPoints(), sprintStart));
-            ticket.setStatus(cd.getLastStatusBefore(sprintEnd));
-
-            class Change {
-                ZonedDateTime when;
-                boolean fromContains;
-                boolean toContains;
-
-                Change(ZonedDateTime w, boolean f, boolean t) {
-                    when = w;
-                    fromContains = f;
-                    toContains = t;
-                }
-            }
-            List<Change> sprintChanges = new ArrayList<>();
-
-            for (AvancementHistorique h : cd.getSprintHistorique()) {
-                if (!"Sprint".equalsIgnoreCase(h.getField())) continue;
-
-                boolean fromContains = containsSprint(h.getFrom(), sprintId);
-                boolean toContains = containsSprint(h.getTo(), sprintId);
-                if (!fromContains && !toContains) continue;
-                if (fromContains == toContains) continue;
-
-                ZonedDateTime when = ZonedDateTime
-                        .parse(h.getDate(), JIRA_DATE_FORMATTER)
-                        .withZoneSameInstant(sprintStart.getZone());
-
-                sprintChanges.add(new Change(when, fromContains, toContains));
-            }
-
-            if (sprintChanges.isEmpty()) {
-                fallbackAddOrCommit(ticket, sprintId, sprintStart, committed, added);
-                continue;
-            }
-
-            sprintChanges.sort(Comparator.comparing(chg -> chg.when));
-
-            boolean inSprintAtStart = false;
-            ZonedDateTime firstAddAfterStart = null;
-            ZonedDateTime firstRemoveDuring = null;
-
-            for (Change chg : sprintChanges) {
-                if (chg.when.isAfter(sprintEnd)) break;
-
-                if (!chg.when.isAfter(sprintStart)) {
-                    inSprintAtStart = chg.toContains;
-                } else {
-                    if (!chg.fromContains && chg.toContains && firstAddAfterStart == null) {
-                        firstAddAfterStart = chg.when;
-                    }
-                    if (chg.fromContains && !chg.toContains && firstRemoveDuring == null) {
-                        firstRemoveDuring = chg.when;
-                    }
-                }
-            }
-
-            if (inSprintAtStart) {
-                committed.add(ticket);
-            } else if (firstAddAfterStart != null) {
-                added.add(ticket);
-            } else {
-                fallbackAddOrCommit(ticket, sprintId, sprintStart, committed, added);
-            }
-
-            if (firstRemoveDuring != null) {
-                removed.add(ticket);
-            }
-        }
-
-        return new SprintCommitInfo(committed, added, removed);
-    }
-
-    private void fallbackAddOrCommit(Ticket ticket, String sprintId, ZonedDateTime sprintStart,
-                                     List<Ticket> committed, List<Ticket> added) {
-        if (ticket.getSprintIds().contains(sprintId)) {
-            ZonedDateTime created = ticket.getCreatedDate().atStartOfDay(sprintStart.getZone());
-            if (created.isAfter(sprintStart)) added.add(ticket);
-            else committed.add(ticket);
-        }
     }
 
     // =====================================================================
