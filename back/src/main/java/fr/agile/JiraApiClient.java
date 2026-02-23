@@ -503,18 +503,32 @@ public class JiraApiClient {
                 .sorted(Comparator.comparing(SprintInfoDTO::getStartDate))
                 .toList();
 
+        List<JsonNode> epicIssues = searchIssuesByJql(
+                String.format("project = %s AND issuetype = Epic", projectKey),
+                List.of("key", "summary", "status", "created", "resolutiondate", "fixVersions")
+        );
+
+        Map<String, Set<Long>> sprintIdsByEpic = new HashMap<>();
+        for (JsonNode issue : epicIssues) {
+            String epicKey = issue.path("key").asText();
+            sprintIdsByEpic.put(epicKey, getSprintIdsForEpicFromChildren(projectKey, epicKey));
+        }
+
         List<SprintVersionEpicDurationDTO> result = new ArrayList<>();
         for (SprintInfoDTO sprint : sprints) {
-            String jql = String.format("project = %s AND sprint = %d AND issuetype = Epic", projectKey, sprint.getId());
-            List<JsonNode> issues = searchIssuesByJql(jql, List.of("key", "summary", "status", "created", "resolutiondate", "fixVersions"));
-
             Map<String, List<EpicDurationEntryDTO>> epicsByVersion = new HashMap<>();
-            for (JsonNode issue : issues) {
+
+            for (JsonNode issue : epicIssues) {
                 String epicKey = issue.path("key").asText();
                 JsonNode fields = issue.path("fields");
+
+                Set<Long> sprintIds = sprintIdsByEpic.getOrDefault(epicKey, Set.of());
+                if (!sprintIds.contains(sprint.getId())) {
+                    continue;
+                }
+
                 String epicSummary = fields.path("summary").asText("Sans résumé");
                 String status = fields.path("status").path("name").asText("Inconnu");
-
                 ZonedDateTime createdDate = jiraParser.parseJiraDate(fields.path("created").asText(null), Z_PARIS);
                 ZonedDateTime resolutionDate = jiraParser.parseJiraDate(fields.path("resolutiondate").asText(null), Z_PARIS);
                 double durationDays = computeDurationWithinSprint(createdDate, resolutionDate, sprint.getStartDate(), sprint.getEndDate());
@@ -525,12 +539,12 @@ public class JiraApiClient {
                         String versionName = versionNode.path("name").asText("Sans version");
                         epicsByVersion
                                 .computeIfAbsent(versionName, ignored -> new ArrayList<>())
-                                .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays));
+                                .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays, sprintIds.stream().sorted().toList()));
                     }
                 } else {
                     epicsByVersion
                             .computeIfAbsent("Sans version", ignored -> new ArrayList<>())
-                            .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays));
+                            .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays, sprintIds.stream().sorted().toList()));
                 }
             }
 
@@ -556,6 +570,32 @@ public class JiraApiClient {
                 .comparing(SprintVersionEpicDurationDTO::sprintId)
                 .thenComparing(SprintVersionEpicDurationDTO::versionName));
         return result;
+    }
+
+    private Set<Long> getSprintIdsForEpicFromChildren(String projectKey, String epicKey) throws Exception {
+        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"", projectKey, epicKey);
+        List<JsonNode> childIssues;
+
+        try {
+            childIssues = searchIssuesByJql(epicLinkJql, List.of("customfield_10020"));
+        } catch (Exception ex) {
+            String parentJql = String.format("project = %s AND parent = \"%s\"", projectKey, epicKey);
+            childIssues = searchIssuesByJql(parentJql, List.of("customfield_10020"));
+        }
+
+        Set<Long> sprintIds = new TreeSet<>();
+        for (JsonNode childIssue : childIssues) {
+            JsonNode sprintField = childIssue.path("fields").path("customfield_10020");
+            if (!sprintField.isArray()) {
+                continue;
+            }
+            for (JsonNode sprintNode : sprintField) {
+                if (sprintNode.has("id")) {
+                    sprintIds.add(sprintNode.path("id").asLong());
+                }
+            }
+        }
+        return sprintIds;
     }
 
     private List<JsonNode> searchIssuesByJql(String jql, List<String> fields) throws Exception {
