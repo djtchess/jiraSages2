@@ -1,28 +1,32 @@
 package fr.agile.controller;
 
-import java.util.List;
-
+import fr.agile.JiraApiClient;
+import fr.agile.dto.BurnupDataDTO;
+import fr.agile.dto.SprintInfoDTO;
+import fr.agile.dto.SprintKpiInfo;
+import fr.agile.exception.JiraIntegrationException;
+import fr.agile.service.SprintService;
+import fr.agile.service.SprintStatsService;
+import fr.agile.utils.BurnupUtils;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import fr.agile.JiraApiClient;
-import fr.agile.dto.BurnupDataDTO;
-import fr.agile.dto.SprintInfoDTO;
-import fr.agile.dto.SprintKpiInfo;
-import fr.agile.service.SprintService;
-import fr.agile.service.SprintStatsService;
-import fr.agile.utils.BurnupUtils;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/jira")
 @CrossOrigin(origins = "*") // Autorise les appels depuis Angular
+@Validated
 public class JiraController {
 
     private static final Logger log = LoggerFactory.getLogger(JiraController.class);
@@ -32,22 +36,35 @@ public class JiraController {
     @Autowired private SprintStatsService sprintStatsService;
 
     @GetMapping("/burnup/{sprintId}")
-    public BurnupDataDTO getBurnupData(@PathVariable Long sprintId) throws Exception {
+    public BurnupDataDTO getBurnupData(@PathVariable @Positive Long sprintId) {
         log.info("Calcul du burnup demandé pour le sprint {}", sprintId);
-        return jiraApiClient.calculateBurnupForSprint(String.valueOf(sprintId));
+        try {
+            return jiraApiClient.calculateBurnupForSprint(String.valueOf(sprintId));
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de récupérer les données burnup depuis Jira.", ex);
+        }
     }
 
 
     @GetMapping("/{sprintId}")
-    public SprintInfoDTO getSprintInfo(@PathVariable String sprintId) throws Exception {
+    public SprintInfoDTO getSprintInfo(@PathVariable @NotBlank String sprintId) {
         log.info("Récupération des informations du sprint {}", sprintId);
-        return jiraApiClient.getSprintInfo(sprintId);
+        try {
+            return jiraApiClient.getSprintInfo(sprintId);
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de récupérer les informations du sprint depuis Jira.", ex);
+        }
     }
 
     @GetMapping(value ="/projects/{projectKey}/sprints", produces = "application/json")
-    public ResponseEntity<List<SprintInfoDTO>> getSprintsForProject(@PathVariable String projectKey) throws Exception {
+    public ResponseEntity<List<SprintInfoDTO>> getSprintsForProject(@PathVariable @NotBlank String projectKey) {
         log.info("Récupération des sprints pour le projet {}", projectKey);
-        List<SprintInfoDTO> sprints = jiraApiClient.getAllSprintsForBoard(6);
+        List<SprintInfoDTO> sprints;
+        try {
+            sprints = jiraApiClient.getAllSprintsForBoard(6);
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de récupérer les sprints depuis Jira.", ex);
+        }
 
         for (SprintInfoDTO dto : sprints) {
             sprintService.getById(dto.getId()).ifPresent(si -> {
@@ -77,19 +94,21 @@ public class JiraController {
 
 
     @GetMapping("/sprints/{id}/full-info")
-    public SprintInfoDTO getFullSprintInfo(@PathVariable String id) throws Exception {
+    public SprintInfoDTO getFullSprintInfo(@PathVariable @NotBlank String id) {
         log.info("Analyse complète demandée pour le sprint {}", id);
-        JiraApiClient.SprintCommitInfo commitInfo = jiraApiClient.analyseTicketsSprint(id);
-        log.info("Analyse des tickets terminée pour le sprint {}", id);
-        SprintKpiInfo kpiInfo = sprintStatsService.computeKpis(commitInfo);
-        log.info("Calcul des KPIs terminé pour le sprint {}", id);
+        JiraApiClient.SprintCommitInfo commitInfo;
+        try {
+            commitInfo = jiraApiClient.analyseTicketsSprint(id);
+            log.info("Analyse des tickets terminée pour le sprint {}", id);
+            SprintKpiInfo kpiInfo = sprintStatsService.computeKpis(commitInfo);
+            log.info("Calcul des KPIs terminé pour le sprint {}", id);
 
-        SprintInfoDTO sprintInfoDTO = jiraApiClient.getSprintInfo(id);
-        sprintInfoDTO.setCommitInfo(commitInfo);
-        sprintInfoDTO.setSprintKpiInfo(kpiInfo);
-
-        return sprintInfoDTO;
+            SprintInfoDTO sprintInfoDTO = jiraApiClient.getSprintInfo(id);
+            sprintInfoDTO.setCommitInfo(commitInfo);
+            sprintInfoDTO.setSprintKpiInfo(kpiInfo);
+            return sprintInfoDTO;
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de calculer les informations complètes du sprint.", ex);
+        }
     }
-
-
 }

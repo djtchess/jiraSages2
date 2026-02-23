@@ -22,7 +22,8 @@ import fr.agile.IssueChangelogData;
 import fr.agile.JiraApiClient;
 import fr.agile.dto.CapaciteDevProchainSprintDTO;
 import fr.agile.dto.CapaciteDeveloppeurDTO;
-import fr.agile.dto.SprintInfoDTO;
+import fr.agile.exception.JiraIntegrationException;
+import fr.agile.exception.ResourceNotFoundException;
 import fr.agile.entities.Developper;
 import fr.agile.entities.Event;
 import fr.agile.entities.JoursFeries;
@@ -56,13 +57,14 @@ public class SprintCapacityService {
     @Autowired private SprintDevelopperAvailabilityRepository sprintDevAvailRepository;
 
     @Transactional(readOnly = true)
-    public CapaciteDevProchainSprintDTO getCapaciteEtRestePourDev(Long boardId, Long nextSprintId, Long developperId) throws Exception {
+    public CapaciteDevProchainSprintDTO getCapaciteEtRestePourDev(Long boardId, Long nextSprintId, Long developperId) {
 
-        SprintInfo nextSprint = sprintInfoRepository.findById(nextSprintId).orElse(null);
+        SprintInfo nextSprint = sprintInfoRepository.findById(nextSprintId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint introuvable: " + nextSprintId));
 
         // --- 0) Développeur
         Developper dev = developperRepository.findById(developperId)
-                .orElseThrow(() -> new IllegalArgumentException("Développeur introuvable: " + developperId));
+                .orElseThrow(() -> new ResourceNotFoundException("Développeur introuvable: " + developperId));
 
         // --- 1) Capacité BRUTE (jours ouvrés – fériés – événements)
         var calc         = new SprintCapacityCalculator();
@@ -90,7 +92,12 @@ public class SprintCapacityService {
             String jql = getTicketsSprint(String.valueOf(currentSprint.getId()));
             System.out.println(jql);
 
-            List<Ticket> allPrevTickets = jiraApiClient.getTicketsParJql(jql, currentSprint.getStartDate(), false);
+            List<Ticket> allPrevTickets;
+            try {
+                allPrevTickets = jiraApiClient.getTicketsParJql(jql, currentSprint.getStartDate(), false);
+            } catch (Exception ex) {
+                throw new JiraIntegrationException("Impossible de récupérer les tickets du sprint courant depuis Jira.", ex);
+            }
 
             // 3.b) Filtre "assigné au dev"
             String fullName = (dev.getPrenomDevelopper() + " " + dev.getNomDevelopper()).trim();
@@ -156,9 +163,9 @@ public class SprintCapacityService {
         }
 
         SprintInfo sprint = sprintInfoRepository.findById(sprintId)
-                .orElseThrow(() -> new IllegalArgumentException("Sprint introuvable: " + sprintId));
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint introuvable: " + sprintId));
         Developper dev = developperRepository.findById(devId)
-                .orElseThrow(() -> new IllegalArgumentException("Développeur introuvable: " + devId));
+                .orElseThrow(() -> new ResourceNotFoundException("Développeur introuvable: " + devId));
 
         SprintDevelopperAvailability entity = sdaRepository
                 .findBySprint_IdAndDevelopper_Id(sprintId, devId)
@@ -187,10 +194,10 @@ public class SprintCapacityService {
 
 
     @Transactional(readOnly = true)
-    public List<CapaciteDevProchainSprintDTO> getCapaciteEtRestePourTousDevsOptim(Long boardId, Long nextSprintId) throws Exception {
+    public List<CapaciteDevProchainSprintDTO> getCapaciteEtRestePourTousDevsOptim(Long boardId, Long nextSprintId) {
 
         SprintInfo nextSprint = sprintInfoRepository.findById(nextSprintId)
-                .orElseThrow(() -> new IllegalArgumentException("Sprint (next) introuvable: " + nextSprintId));
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint (next) introuvable: " + nextSprintId));
 
         SprintInfo currentSprint = sprintInfoRepository
                 .findFirstByOriginBoardIdAndStateIgnoreCaseOrderByStartDateDesc(boardId, "active")
@@ -200,7 +207,11 @@ public class SprintCapacityService {
         List<Ticket> allPrevTickets = Collections.emptyList();
         if (currentSprint != null) {
             String jql = getTicketsSprint(String.valueOf(currentSprint.getId()));
-            allPrevTickets = jiraApiClient.getTicketsParJql(jql, currentSprint.getStartDate(), false);
+            try {
+                allPrevTickets = jiraApiClient.getTicketsParJql(jql, currentSprint.getStartDate(), false);
+            } catch (Exception ex) {
+                throw new JiraIntegrationException("Impossible de récupérer les tickets du sprint actif depuis Jira.", ex);
+            }
         }
 
         // 2) Grouper par assigné (lower-case pour comparaison robuste)
