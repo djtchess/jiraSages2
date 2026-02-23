@@ -2,11 +2,9 @@ package fr.agile;
 
 import java.io.IOException;
 import java.net.http.HttpRequest;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -22,7 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,9 +28,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import fr.agile.dto.AvancementHistorique;
 import fr.agile.dto.BoardInfo;
@@ -47,7 +41,9 @@ import fr.agile.entities.SprintInfo;
 import fr.agile.model.dto.Ticket;
 import fr.agile.service.DevelopperService;
 import fr.agile.service.EventService;
+import fr.agile.service.ChangelogCacheService;
 import fr.agile.service.JiraHttpClient;
+import fr.agile.service.JiraParser;
 import fr.agile.service.JoursFeriesService;
 import fr.agile.service.SprintService;
 import fr.agile.sprint.SprintCapacityCalculator;
@@ -60,29 +56,11 @@ public class JiraApiClient {
     @Value("${jira.baseUrl}")
     private String JIRA_URL;
 
-    @Value("${jira.username}")
-    private String USERNAME;
-
-    @Value("${jira.apiToken}")
-    private String API_TOKEN;
-
-    private static final String SEARCH_API = "/rest/api/3/search";
-    private static final String ISSUE_API = "/rest/api/3/issue/";
     private static final String SEARCH_JQL_API = "/rest/api/3/search/jql";
 
     private static final ZoneId Z_PARIS = ZoneId.of("Europe/Paris");
     private static final DateTimeFormatter JIRA_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX");
-
-    private static final ObjectMapper mapper = new ObjectMapper();
-
-    // (Optionnel) Conserve l'ancienne constante si utilisée ailleurs
-    private static final String FIELDS = String.join(",",
-            "key", "assignee", "status", "created", "fixVersions",
-            "customfield_10028",     // story points
-            "customfield_10126",     // avancement
-            "customfield_10020"      // sprint(s)
-    );
 
     @Autowired
     private DevelopperService developpeurService;
@@ -96,20 +74,25 @@ public class JiraApiClient {
     private SprintCapacityCalculator calculator;
 
     private final JiraHttpClient jiraHttpClient;
-    private final Map<String, IssueChangelogData> changelogCache = new ConcurrentHashMap<>();
+    private final JiraParser jiraParser;
+    private final ChangelogCacheService changelogCacheService;
 
     public JiraApiClient(SprintService sprintService,
                          DevelopperService developpeurService,
                          EventService evenementService,
                          JoursFeriesService joursFeriesService,
                          SprintCapacityCalculator calculator,
-                         JiraHttpClient jiraHttpClient) {
+                         JiraHttpClient jiraHttpClient,
+                         JiraParser jiraParser,
+                         ChangelogCacheService changelogCacheService) {
         this.developpeurService = developpeurService;
         this.evenementService = evenementService;
         this.joursFeriesService = joursFeriesService;
         this.calculator = calculator;
         this.sprintService = sprintService;
         this.jiraHttpClient = jiraHttpClient;
+        this.jiraParser = jiraParser;
+        this.changelogCacheService = changelogCacheService;
     }
 
     // =====================================================================
@@ -133,69 +116,13 @@ public class JiraApiClient {
         boolean isLast = false;
 
         while (!isLast) {
-            // Corps JSON VALIDE: pas de startAt sur /search/jql
-            ObjectNode body = mapper.createObjectNode();
-            body.put("jql", jql);
-            body.put("maxResults", maxResults);
-            if (nextPageToken != null) {
-                body.put("nextPageToken", nextPageToken);
-            }
-
-            // fields doit être un tableau JSON
-            ArrayNode fieldsArray = body.putArray("fields");
-            fieldsArray.add("key")
-                    .add("assignee")
-                    .add("status")
-                    .add("created")
-                    .add("fixVersions")
-                    .add("issuetype")
-                    .add("customfield_10028")   // story points
-                    .add("customfield_10126")   // avancement
-                    .add("customfield_10020")   // sprint(s)
-                    .add("customfield_10242");  // engagement sprint ? (si présent)
-
+            var body = jiraParser.buildSearchJqlBody(jql, maxResults, nextPageToken);
             HttpRequest request = jiraHttpClient.createPostJsonRequest(urlString, body.toString());
             String response = jiraHttpClient.sendRequest(request);
+            JiraParser.TicketPage ticketPage = jiraParser.parseTicketPage(response, JIRA_URL);
 
-            JsonNode rootNode = mapper.readTree(response);
-            JsonNode issuesNode = rootNode.path("issues");
-
-            for (JsonNode issue : issuesNode) {
-                String key = issue.path("key").asText();
-                JsonNode fields = issue.path("fields");
-
-                String assignee = fields.path("assignee").isMissingNode() || fields.path("assignee").isNull()
-                        ? "Non assigné"
-                        : fields.path("assignee").path("displayName").asText();
-
-                String status = fields.path("status").path("name").asText("Inconnu");
-                String storyPts = fields.path("customfield_10028").isNull() ? null : fields.path("customfield_10028").asText();
-                String avancement = fields.path("customfield_10126").isNull() ? null : fields.path("customfield_10126").asText();
-                String type = fields.path("issuetype").path("name").asText("Inconnu");
-                String url = JIRA_URL + "/browse/" + key;
-
-                JsonNode customField = fields.path("customfield_10242");
-                String engagementSprint = null;
-                if (customField.isArray() && customField.size() > 0) {
-                    engagementSprint = customField.get(0).path("value").asText(null);
-                }
-
-                JsonNode fixVersionsNode = fields.path("fixVersions");
-                String versionCorrigee = null;
-                if (fixVersionsNode.isArray() && fixVersionsNode.size() > 0) {
-                    versionCorrigee = fixVersionsNode.get(0).path("name").asText();
-                }
-
-                LocalDate created = LocalDate.parse(fields.path("created").asText().substring(0, 10));
-
-                // SprintIds liés
-                List<String> sprintIds = new ArrayList<>();
-                JsonNode sprintField = fields.path("customfield_10020");
-                if (sprintField.isArray()) {
-                    for (JsonNode s : sprintField) {
-                        if (s.has("id")) sprintIds.add(s.path("id").asText());
-                    }
-                }
+            for (Ticket t : ticketPage.tickets()) {
+                String key = t.getTicketKey();
 
                 // Filtrage "Dev terminé avant le sprint"
                 boolean devAvantSprint = false;
@@ -208,21 +135,6 @@ public class JiraApiClient {
                     }
                 }
 
-                Ticket t = Ticket.builder()
-                        .ticketKey(key)
-                        .url(url)
-                        .assignee(assignee)
-                        .status(status)
-                        .storyPoints(BurnupUtils.parseDouble(storyPts))
-                        .storyPointsRealiseAvantSprint(null)
-                        .avancement(BurnupUtils.parseDouble(avancement))
-                        .engagementSprint(engagementSprint)
-                        .type(type)
-                        .versionCorrigee(versionCorrigee)
-                        .createdDate(created)
-                        .sprintIds(sprintIds)
-                        .build();
-
                 if (devAvantSprint) {
                     t.setDevTermineAvantSprint(true);
                 } else {
@@ -230,11 +142,8 @@ public class JiraApiClient {
                 }
             }
 
-            // Nouvelle pagination: isLast + nextPageToken
-            isLast = rootNode.path("isLast").asBoolean(false);
-            nextPageToken = rootNode.path("nextPageToken").isMissingNode()
-                    ? null
-                    : rootNode.path("nextPageToken").asText(null);
+            isLast = ticketPage.isLast();
+            nextPageToken = ticketPage.nextPageToken();
         }
 
         return ticketList;
@@ -244,26 +153,25 @@ public class JiraApiClient {
     // Changelog (avec cache + vraie pagination)
     // =====================================================================
 
-    // Cache changelog avec TTL
-    private final Map<String, Instant> changelogCacheTs = new ConcurrentHashMap<>();
-    private static final Duration CHANGELOG_TTL = Duration.ofHours(2);
-
     private IssueChangelogData getChangelogCached(String issueKey) throws Exception {
-        var now = Instant.now();
-        var ts = changelogCacheTs.get(issueKey);
-        var cached = changelogCache.get(issueKey);
-        if (cached != null && ts != null && ts.plus(CHANGELOG_TTL).isAfter(now)) {
-            return cached;
+        try {
+            return changelogCacheService.getOrLoad(issueKey, () -> {
+                try {
+                    return getChangelogData(issueKey);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof Exception nested) {
+                throw nested;
+            }
+            throw e;
         }
-        var fresh = getChangelogData(issueKey);
-        changelogCache.put(issueKey, fresh);
-        changelogCacheTs.put(issueKey, now);
-        return fresh;
     }
 
     public void invalidateChangelog(String issueKey) {
-        changelogCache.remove(issueKey);
-        changelogCacheTs.remove(issueKey);
+        changelogCacheService.evict(issueKey);
     }
 
     /**
@@ -283,39 +191,14 @@ public class JiraApiClient {
             HttpRequest request = jiraHttpClient.createRequest(url);
             String body = jiraHttpClient.sendRequest(request);
 
-            JsonNode root = mapper.readTree(body);
-            // L’endpoint /changelog retourne "values"
-            JsonNode histories = root.path("values");
-            int total = root.path("total").asInt();
-
-            for (JsonNode history : histories) {
-                String createdStr = history.path("created").asText();
-                ZonedDateTime createdZdt = ZonedDateTime.parse(createdStr, JIRA_DATE_FORMATTER);
-
-                for (JsonNode item : history.path("items")) {
-                    String field = item.path("field").asText("");
-                    switch (field.toLowerCase()) {
-                        case "status" -> {
-                            String toStatus = item.path("toString").asText();
-                            statusParDate.put(createdZdt.toLocalDateTime(), toStatus);
-                        }
-                        case "avancement" -> {
-                            String from = getTextSafe(item, "fromString");
-                            String to = getTextSafe(item, "toString");
-                            avancementMap.put(createdStr, new AvancementHistorique(createdStr, "avancement", from, to));
-                        }
-                        case "sprint" -> {
-                            String from = item.path("from").asText(null);
-                            String to = item.path("to").asText(null);
-                            sprintHistories.add(new AvancementHistorique(createdStr, "Sprint", from, to));
-                        }
-                        default -> { /* ignore */ }
-                    }
-                }
-            }
+            JiraParser.ChangelogPage changelogPage = jiraParser.parseChangelogPage(body);
+            avancementMap.putAll(changelogPage.data().getAvancementHistorique().stream()
+                    .collect(Collectors.toMap(AvancementHistorique::getDate, a -> a, (a, b) -> b)));
+            statusParDate.putAll(changelogPage.data().getStatutAvantDateMap());
+            sprintHistories.addAll(changelogPage.data().getSprintHistorique());
 
             startAt += maxResults;
-            hasMore = startAt < total;
+            hasMore = startAt < changelogPage.total();
         }
 
         List<AvancementHistorique> avancementHistorique = new ArrayList<>(avancementMap.values());
@@ -323,12 +206,6 @@ public class JiraApiClient {
 
         return new IssueChangelogData(avancementHistorique, statusParDate, sprintHistories);
     }
-
-    private String getTextSafe(JsonNode node, String path) {
-        JsonNode child = node.path(path);
-        return child.isMissingNode() || child.isNull() ? null : child.asText();
-    }
-
     // =====================================================================
     // Aide "dev terminé avant le sprint"
     // =====================================================================
@@ -601,76 +478,7 @@ public class JiraApiClient {
         String urlString = JIRA_URL + "/rest/agile/1.0/sprint/" + sprintId;
         HttpRequest request = jiraHttpClient.createRequest(urlString);
         String response = jiraHttpClient.sendRequest(request);
-        JsonNode sprintNode = mapper.readTree(response);
-
-        String state = sprintNode.path("state").asText();
-        String startDateStr = sprintNode.path("startDate").asText(null);
-        String endDateStr = sprintNode.path("endDate").asText(null);
-        String completeDateStr = sprintNode.path("completeDate").asText(null);
-
-        SprintInfoDTO sprint = new SprintInfoDTO();
-        sprint.setId(sprintNode.path("id").asLong());
-        sprint.setName(sprintNode.path("name").asText());
-        sprint.setState(state);
-        sprint.setOriginBoardId(sprintNode.path("originBoardId").asLong());
-
-        // Conversion des String -> ZonedDateTime dans le fuseau que tu utilises (ex: Europe/Paris)
-        ZoneId zone = Z_PARIS; // ou ZoneId.of("Europe/Paris")
-        sprint.setStartDate(parseJiraDate(startDateStr, zone));
-        sprint.setCompleteDate(parseJiraDate(completeDateStr, zone));
-        sprint.setEndDate(resolveEffectiveEndDate(state, endDateStr, completeDateStr, zone));
-
-        return sprint;
-    }
-
-    // Utils dates (dans JiraApiClient par ex.)
-    private static final DateTimeFormatter[] JIRA_FORMATS = new DateTimeFormatter[] {
-            DateTimeFormatter.ISO_OFFSET_DATE_TIME,                         // 2024-08-30T13:07:52Z ou +00:00
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX"),      // 2024-08-30T13:07:52.000Z
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX")           // 2024-08-30T13:07:52Z
-    };
-
-    private static ZonedDateTime parseJiraDate(String dateStr, ZoneId targetZone) {
-        if (dateStr == null || dateStr.isBlank()) return null;
-        for (DateTimeFormatter f : JIRA_FORMATS) {
-            try {
-                // OffsetDateTime -> on respecte l’offset fourni par JIRA puis on convertit dans le fuseau cible
-                var odt = java.time.OffsetDateTime.parse(dateStr, f);
-                return odt.atZoneSameInstant(targetZone);
-            } catch (Exception ignore) { /* on tente le format suivant */ }
-        }
-        // Dernier filet : si ça finit par 'Z', Instant.parse sait faire.
-        try {
-            return java.time.Instant.parse(dateStr).atZone(targetZone);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Format de date JIRA inattendu: " + dateStr, e);
-        }
-    }
-
-    /**
-     * Calcule la "date de fin effective" en ZonedDateTime.
-     * - closed  -> completeDate si présente
-     * - active  -> si endDate < aujourd’hui (dans zoneId), clamp à aujourd’hui ; sinon endDate
-     * - autres  -> endDate
-     */
-    public ZonedDateTime resolveEffectiveEndDate(
-            String state,
-            String endDateStr,
-            String completeDateStr,
-            ZoneId zoneId
-    ) {
-        ZonedDateTime endDate = parseJiraDate(endDateStr, zoneId);
-        ZonedDateTime completeDate = parseJiraDate(completeDateStr, zoneId);
-
-        if ("closed".equalsIgnoreCase(state) && completeDate != null) {
-            return completeDate;
-        } else if ("active".equalsIgnoreCase(state) && endDate != null) {
-            ZonedDateTime today = ZonedDateTime.now(zoneId);
-            if (endDate.toLocalDate().isBefore(today.toLocalDate())) {
-                return today;
-            }
-        }
-        return endDate;
+        return jiraParser.parseSprintInfo(response, Z_PARIS);
     }
 
 
@@ -685,17 +493,9 @@ public class JiraApiClient {
             HttpRequest request = jiraHttpClient.createRequest(urlString);
             String response = jiraHttpClient.sendRequest(request);
 
-            JsonNode rootNode = mapper.readTree(response);
-            JsonNode values = rootNode.path("values");
-            isLast = rootNode.path("isLast").asBoolean();
-
-            for (JsonNode boardNode : values) {
-                BoardInfo board = new BoardInfo();
-                board.setId(boardNode.path("id").asLong());
-                board.setName(boardNode.path("name").asText());
-                board.setType(boardNode.path("type").asText());
-                boards.add(board);
-            }
+            JiraParser.BoardsPage page = jiraParser.parseBoardsPage(response);
+            boards.addAll(page.boards());
+            isLast = page.isLast();
             startAt += maxResults;
         }
         return boards;
@@ -706,7 +506,7 @@ public class JiraApiClient {
         int startAt = 0;
         int maxResults = 50;
 
-        final ZoneId zone = Z_PARIS; // ou ZoneId.of("Europe/Paris")
+        final ZoneId zone = Z_PARIS;
         final ZonedDateTime filtreDate = ZonedDateTime.of(2024, 10, 7, 0, 0, 0, 0, zone);
 
         while (true) {
@@ -715,45 +515,13 @@ public class JiraApiClient {
             HttpRequest request = jiraHttpClient.createRequest(urlString);
             String response = jiraHttpClient.sendRequest(request);
 
-            JsonNode root = mapper.readTree(response);
-            JsonNode values = root.path("values");
-
-            // Jira renvoie normalement "isLast": true/false
-            boolean isLast = root.path("isLast").asBoolean(values.size() < maxResults);
-
-            for (JsonNode sprintNode : values) {
-                String state = sprintNode.path("state").asText();
-                String startDateStr = sprintNode.path("startDate").asText(null);
-                String endDateStr = sprintNode.path("endDate").asText(null);
-                String completeDateStr = sprintNode.path("completeDate").asText(null);
-
-                ZonedDateTime startDate = parseJiraDate(startDateStr, zone);
-                ZonedDateTime completeDate = parseJiraDate(completeDateStr, zone);
-                ZonedDateTime effectiveEnd = resolveEffectiveEndDate(
-                        state, endDateStr, completeDateStr, zone);
-
-                SprintInfoDTO sprint = new SprintInfoDTO();
-                sprint.setId(sprintNode.path("id").asLong());
-                sprint.setName(sprintNode.path("name").asText());
-                sprint.setState(state);
-                sprint.setStartDate(startDate);
-                sprint.setCompleteDate(completeDate);
-                sprint.setEndDate(effectiveEnd);
-                sprint.setOriginBoardId(boardId);
-
-                if (startDate != null) {
-                    if (startDate.isAfter(filtreDate)) {
-                        sprintList.add(sprint);
-                    }
-                } else {
-                    System.out.printf("Sprint name=%s n'a pas de date de début%n", sprint.getName());
-                }
-            }
+            JiraParser.SprintsPage page = jiraParser.parseSprintsPage(response, boardId, zone, filtreDate);
+            sprintList.addAll(page.sprints());
 
             System.out.println("Nombre de sprints filtrés : " + sprintList.size());
 
-            if (isLast) break;            // fin de pagination
-            startAt += maxResults;        // page suivante
+            if (page.isLast()) break;
+            startAt += maxResults;
         }
 
         return sprintList;
@@ -806,7 +574,6 @@ public class JiraApiClient {
         List<Ticket> added = new ArrayList<>();
         List<Ticket> removed = new ArrayList<>();
 
-        int idx = 1;
 
         for (Ticket ticket : tickets) {
             IssueChangelogData cd = getChangelogCached(ticket.getTicketKey());
