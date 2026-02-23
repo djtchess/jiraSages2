@@ -26,7 +26,7 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
 
   isLoading = false;
   data: EpicDeliveryOverview[] = [];
-  displayedColumns: string[] = ['epicKey', 'epicSummary', 'status', 'versions', 'teamsAndSprints'];
+  displayedColumns: string[] = ['epicKey', 'epicSummary', 'status', 'versions', 'sprints'];
   chartOptions: EChartsOption = {};
 
   constructor(private jiraService: JiraService) {}
@@ -43,7 +43,7 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
 
   loadData(): void {
     this.isLoading = true;
-    this.jiraService.getEpicDeliveriesByTeam(this.projectKey).subscribe({
+    this.jiraService.getEpicDeliveries(this.projectKey).subscribe({
       next: (rows) => {
         this.data = rows;
         this.buildChart(rows);
@@ -61,36 +61,36 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     return row.versionNames.join(', ');
   }
 
-  formatTeamsAndSprints(row: EpicDeliveryOverview): string {
-    const grouped: Record<string, string[]> = {};
-    for (const delivery of row.sprintDeliveries) {
-      grouped[delivery.teamName] = grouped[delivery.teamName] || [];
-      grouped[delivery.teamName].push(delivery.sprintName);
-    }
-
-    return Object.entries(grouped)
-      .map(([team, sprints]) => `${team}: ${sprints.join(' / ')}`)
-      .join(' | ');
+  formatSprints(row: EpicDeliveryOverview): string {
+    return row.sprintDeliveries.map(s => s.sprintName).join(' / ');
   }
 
   private buildChart(rows: EpicDeliveryOverview[]): void {
     const epics = rows.map(r => r.epicKey);
-    const teams = Array.from(new Set(rows.flatMap(r => r.sprintDeliveries.map(d => d.teamName))));
-
-    const series: any[] = teams.map(team => ({
-      name: team,
-      type: 'bar',
-      stack: 'total',
-      data: rows.map(row => row.sprintDeliveries.filter(d => d.teamName === team).length)
-    }));
+    const sprintCount = rows.map(r => r.sprintDeliveries.length);
+    const versionCount = rows.map(r => r.versionNames.length);
 
     this.chartOptions = {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { type: 'scroll' },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const idx = params?.[0]?.dataIndex ?? 0;
+          const epic = rows[idx];
+          const versions = epic?.versionNames?.join(', ') ?? 'Sans version';
+          const sprints = epic?.sprintDeliveries?.map(s => s.sprintName).join(' / ') ?? '-';
+          const lines = (params as any[]).map(p => `${p.marker} ${p.seriesName}: <b>${p.value}</b>`).join('<br/>');
+          return `<b>${epic?.epicKey ?? ''}</b><br/>${lines}<br/>Versions: <b>${versions}</b><br/>Sprints: <b>${sprints}</b>`;
+        }
+      },
+      legend: { data: ['Nb sprints', 'Nb versions'] },
+      grid: { left: '3%', right: '4%', bottom: '8%', containLabel: true },
       xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35 } },
-      yAxis: { type: 'value', name: 'Nombre de sprints de livraison' },
-      series
+      yAxis: { type: 'value', name: 'Nombre' },
+      series: [
+        { name: 'Nb sprints', type: 'bar', data: sprintCount },
+        { name: 'Nb versions', type: 'bar', data: versionCount }
+      ]
     };
   }
 }

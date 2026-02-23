@@ -116,12 +116,12 @@ public class JiraController {
 
 
     @GetMapping(value = "/projects/{projectKey}/epics/deliveries", produces = "application/json")
-    public ResponseEntity<List<EpicDeliveryOverviewDTO>> getEpicDeliveriesByTeam(@PathVariable @NotBlank String projectKey) {
-        log.info("Récupération des épics avec sprints/équipes/version pour le projet {}", projectKey);
+    public ResponseEntity<List<EpicDeliveryOverviewDTO>> getEpicDeliveries(@PathVariable @NotBlank String projectKey) {
+        log.info("Récupération des épics avec sprints/version pour le projet {}", projectKey);
         try {
-            return ResponseEntity.ok(jiraApiClient.getEpicDeliveriesByTeam(projectKey));
+            return ResponseEntity.ok(jiraApiClient.getEpicDeliveries(projectKey));
         } catch (Exception ex) {
-            throw new JiraIntegrationException("Impossible de récupérer les épics avec équipes/sprints/versions.", ex);
+            throw new JiraIntegrationException("Impossible de récupérer les épics avec sprints/versions.", ex);
         }
     }
 

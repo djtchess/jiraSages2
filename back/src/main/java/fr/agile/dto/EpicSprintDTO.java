@@ -1,7 +1,6 @@
 package fr.agile.dto;
 
-public record EpicTeamSprintDTO(
-        String teamName,
+public record EpicSprintDTO(
         long sprintId,
         String sprintName
 ) {

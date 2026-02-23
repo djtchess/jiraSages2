@@ -21,7 +21,7 @@ export class JiraService {
     return this.http.get<SprintInfo>(`${this.baseUrl}/jira/sprints/${sprintId}/full-info`);
   }
 
-  getEpicDeliveriesByTeam(projectKey: string): Observable<EpicDeliveryOverview[]> {
+  getEpicDeliveries(projectKey: string): Observable<EpicDeliveryOverview[]> {
     return this.http.get<EpicDeliveryOverview[]>(
       `${this.baseUrl}/jira/projects/${projectKey}/epics/deliveries`
     );

@@ -38,7 +38,7 @@ import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.BurnupPointDTO;
 import fr.agile.dto.EpicDeliveryOverviewDTO;
 import fr.agile.dto.EpicDurationEntryDTO;
-import fr.agile.dto.EpicTeamSprintDTO;
+import fr.agile.dto.EpicSprintDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.entities.Developper;
 import fr.agile.entities.Event;
@@ -500,17 +500,15 @@ public class JiraApiClient {
     }
 
 
-    public List<EpicDeliveryOverviewDTO> getEpicDeliveriesByTeam(String projectKey) throws Exception {
+    public List<EpicDeliveryOverviewDTO> getEpicDeliveries(String projectKey) throws Exception {
         List<BoardInfo> boards = getBoardsForProject(projectKey);
 
         Map<Long, SprintInfoDTO> sprintById = new HashMap<>();
-        Map<Long, String> teamBySprintId = new HashMap<>();
 
         for (BoardInfo board : boards) {
             List<SprintInfoDTO> boardSprints = getAllSprintsForBoard(board.getId());
             for (SprintInfoDTO sprint : boardSprints) {
                 sprintById.put(sprint.getId(), sprint);
-                teamBySprintId.put(sprint.getId(), board.getName());
             }
         }
 
@@ -542,17 +540,16 @@ public class JiraApiClient {
             }
 
             Set<Long> sprintIds = getSprintIdsForEpicFromChildren(projectKey, epicKey);
-            List<EpicTeamSprintDTO> deliveries = sprintIds.stream()
+            List<EpicSprintDTO> deliveries = sprintIds.stream()
                     .map(id -> {
                         SprintInfoDTO sprint = sprintById.get(id);
                         if (sprint == null) {
                             return null;
                         }
-                        String teamName = teamBySprintId.getOrDefault(id, "Equipe inconnue");
-                        return new EpicTeamSprintDTO(teamName, id, sprint.getName());
+                        return new EpicSprintDTO(id, sprint.getName());
                     })
                     .filter(Objects::nonNull)
-                    .sorted(Comparator.comparing(EpicTeamSprintDTO::teamName).thenComparing(EpicTeamSprintDTO::sprintId))
+                    .sorted(Comparator.comparing(EpicSprintDTO::sprintId))
                     .toList();
 
             if (!deliveries.isEmpty()) {

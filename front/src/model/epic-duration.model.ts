@@ -1,5 +1,4 @@
-export interface EpicTeamSprintDelivery {
-  teamName: string;
+export interface EpicSprintDelivery {
   sprintId: number;
   sprintName: string;
 }
@@ -9,5 +8,5 @@ export interface EpicDeliveryOverview {
   epicSummary: string;
   status: string;
   versionNames: string[];
-  sprintDeliveries: EpicTeamSprintDelivery[];
+  sprintDeliveries: EpicSprintDelivery[];
 }

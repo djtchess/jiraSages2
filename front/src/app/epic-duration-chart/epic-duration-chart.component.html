@@ -26,9 +26,9 @@
       <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="teamsAndSprints">
-      <th mat-header-cell *matHeaderCellDef>Équipes / Sprints</th>
-      <td mat-cell *matCellDef="let row">{{ formatTeamsAndSprints(row) }}</td>
+    <ng-container matColumnDef="sprints">
+      <th mat-header-cell *matHeaderCellDef>Sprints</th>
+      <td mat-cell *matCellDef="let row">{{ formatSprints(row) }}</td>
     </ng-container>
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
