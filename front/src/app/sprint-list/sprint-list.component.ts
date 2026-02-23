@@ -14,6 +14,7 @@ import { MatIcon, MatIconModule } from '@angular/material/icon';
 import { MatButtonModule, MatIconButton } from '@angular/material/button';
 import { SprintScopeComponent } from '../sprint-scope/sprint-scope.component';
 import { Router } from '@angular/router';
+import { EpicDurationChartComponent } from '../epic-duration-chart/epic-duration-chart.component';
 
 @Component({
   selector: 'app-sprint-list',
@@ -26,6 +27,7 @@ import { Router } from '@angular/router';
     CommonModule,
     BurnupChartComponent,
     SprintScopeComponent,
+    EpicDurationChartComponent,
     MatButtonModule,
     MatIconModule,
     NgIf
@@ -44,7 +46,7 @@ export class SprintListComponent implements OnInit {
 
   selectedScopeSprintId: string | null = null;
   selectedScopeSprintName: string | null = null;
-
+  showEpicDurationChart = false;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -84,6 +86,10 @@ export class SprintListComponent implements OnInit {
   closeScope(): void {
     this.selectedScopeSprintId = null;
     this.selectedScopeSprintName = null;
+  }
+
+  toggleEpicDurationChart(): void {
+    this.showEpicDurationChart = !this.showEpicDurationChart;
   }
 
 

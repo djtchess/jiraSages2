@@ -28,11 +28,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import fr.agile.dto.AvancementHistorique;
 import fr.agile.dto.BoardInfo;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.BurnupPointDTO;
+import fr.agile.dto.EpicDurationEntryDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.entities.Developper;
 import fr.agile.entities.Event;
@@ -50,6 +54,7 @@ import fr.agile.service.SprintService;
 import fr.agile.sprint.SprintCapacityCalculator;
 import fr.agile.utils.BurnupUtils;
 import fr.agile.utils.JqlBuilder;
+import fr.agile.dto.SprintVersionEpicDurationDTO;
 
 @Component
 public class JiraApiClient {
@@ -62,6 +67,7 @@ public class JiraApiClient {
     private static final ZoneId Z_PARIS = ZoneId.of("Europe/Paris");
     private static final DateTimeFormatter JIRA_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX");
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
     private DevelopperService developpeurService;
@@ -489,6 +495,122 @@ public class JiraApiClient {
         }
 
         return sprintList;
+    }
+
+    public List<SprintVersionEpicDurationDTO> getEpicDurationsByVersionForBoard(long boardId, String projectKey) throws Exception {
+        List<SprintInfoDTO> sprints = getAllSprintsForBoard(boardId).stream()
+                .filter(s -> s.getStartDate() != null && s.getEndDate() != null)
+                .sorted(Comparator.comparing(SprintInfoDTO::getStartDate))
+                .toList();
+
+        List<SprintVersionEpicDurationDTO> result = new ArrayList<>();
+        for (SprintInfoDTO sprint : sprints) {
+            String jql = String.format("project = %s AND sprint = %d AND issuetype = Epic", projectKey, sprint.getId());
+            List<JsonNode> issues = searchIssuesByJql(jql, List.of("key", "summary", "status", "created", "resolutiondate", "fixVersions"));
+
+            Map<String, List<EpicDurationEntryDTO>> epicsByVersion = new HashMap<>();
+            for (JsonNode issue : issues) {
+                String epicKey = issue.path("key").asText();
+                JsonNode fields = issue.path("fields");
+                String epicSummary = fields.path("summary").asText("Sans résumé");
+                String status = fields.path("status").path("name").asText("Inconnu");
+
+                ZonedDateTime createdDate = jiraParser.parseJiraDate(fields.path("created").asText(null), Z_PARIS);
+                ZonedDateTime resolutionDate = jiraParser.parseJiraDate(fields.path("resolutiondate").asText(null), Z_PARIS);
+                double durationDays = computeDurationWithinSprint(createdDate, resolutionDate, sprint.getStartDate(), sprint.getEndDate());
+
+                JsonNode fixVersions = fields.path("fixVersions");
+                if (fixVersions.isArray() && fixVersions.size() > 0) {
+                    for (JsonNode versionNode : fixVersions) {
+                        String versionName = versionNode.path("name").asText("Sans version");
+                        epicsByVersion
+                                .computeIfAbsent(versionName, ignored -> new ArrayList<>())
+                                .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays));
+                    }
+                } else {
+                    epicsByVersion
+                            .computeIfAbsent("Sans version", ignored -> new ArrayList<>())
+                            .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays));
+                }
+            }
+
+            for (Map.Entry<String, List<EpicDurationEntryDTO>> entry : epicsByVersion.entrySet()) {
+                List<EpicDurationEntryDTO> epics = entry.getValue();
+                double total = BurnupUtils.roundToTwoDecimals(epics.stream().mapToDouble(EpicDurationEntryDTO::durationDays).sum());
+                int count = epics.size();
+                double average = count == 0 ? 0.0 : BurnupUtils.roundToTwoDecimals(total / count);
+
+                result.add(new SprintVersionEpicDurationDTO(
+                        sprint.getId(),
+                        sprint.getName(),
+                        entry.getKey(),
+                        count,
+                        total,
+                        average,
+                        epics
+                ));
+            }
+        }
+
+        result.sort(Comparator
+                .comparing(SprintVersionEpicDurationDTO::sprintId)
+                .thenComparing(SprintVersionEpicDurationDTO::versionName));
+        return result;
+    }
+
+    private List<JsonNode> searchIssuesByJql(String jql, List<String> fields) throws Exception {
+        final String urlString = JIRA_URL + SEARCH_JQL_API;
+        final int maxResults = 50;
+        String nextPageToken = null;
+        boolean isLast = false;
+        List<JsonNode> issues = new ArrayList<>();
+
+        while (!isLast) {
+            ObjectNode body = MAPPER.createObjectNode();
+            body.put("jql", jql);
+            body.put("maxResults", maxResults);
+            if (nextPageToken != null) {
+                body.put("nextPageToken", nextPageToken);
+            }
+
+            ArrayNode fieldsNode = body.putArray("fields");
+            for (String field : fields) {
+                fieldsNode.add(field);
+            }
+
+            HttpRequest request = jiraHttpClient.createPostJsonRequest(urlString, body.toString());
+            String response = jiraHttpClient.sendRequest(request);
+            JsonNode root = MAPPER.readTree(response);
+
+            for (JsonNode issue : root.path("issues")) {
+                issues.add(issue);
+            }
+
+            isLast = root.path("isLast").asBoolean(false);
+            nextPageToken = root.path("nextPageToken").isMissingNode() ? null : root.path("nextPageToken").asText(null);
+        }
+
+        return issues;
+    }
+
+    private double computeDurationWithinSprint(ZonedDateTime createdDate,
+                                               ZonedDateTime resolutionDate,
+                                               ZonedDateTime sprintStart,
+                                               ZonedDateTime sprintEnd) {
+        if (createdDate == null || sprintStart == null || sprintEnd == null) {
+            return 0.0;
+        }
+
+        ZonedDateTime effectiveStart = createdDate.isAfter(sprintStart) ? createdDate : sprintStart;
+        ZonedDateTime rawEnd = resolutionDate != null ? resolutionDate : sprintEnd;
+        ZonedDateTime effectiveEnd = rawEnd.isBefore(sprintEnd) ? rawEnd : sprintEnd;
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            return 0.0;
+        }
+
+        long hours = java.time.Duration.between(effectiveStart, effectiveEnd).toHours();
+        return BurnupUtils.roundToTwoDecimals(hours / 24.0);
     }
 
 

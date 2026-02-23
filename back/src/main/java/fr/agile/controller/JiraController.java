@@ -4,6 +4,7 @@ import fr.agile.JiraApiClient;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.dto.SprintKpiInfo;
+import fr.agile.dto.SprintVersionEpicDurationDTO;
 import fr.agile.exception.JiraIntegrationException;
 import fr.agile.service.SprintService;
 import fr.agile.service.SprintStatsService;
@@ -109,6 +110,18 @@ public class JiraController {
             return sprintInfoDTO;
         } catch (Exception ex) {
             throw new JiraIntegrationException("Impossible de calculer les informations complètes du sprint.", ex);
+        }
+    }
+
+    @GetMapping(value = "/projects/{projectKey}/boards/{boardId}/epics/durations", produces = "application/json")
+    public ResponseEntity<List<SprintVersionEpicDurationDTO>> getEpicDurationsBySprintAndVersion(
+            @PathVariable @NotBlank String projectKey,
+            @PathVariable @Positive Long boardId) {
+        log.info("Récupération des durées des épics par sprint/version pour le projet {} et board {}", projectKey, boardId);
+        try {
+            return ResponseEntity.ok(jiraApiClient.getEpicDurationsByVersionForBoard(boardId, projectKey));
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de récupérer les durées des épics par sprint/version.", ex);
         }
     }
 }
