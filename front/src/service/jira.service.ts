@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { SprintCommitInfo, SprintInfo, SprintKpiInfo } from '../model/SprintInfo.model';
-import { SprintVersionEpicDuration } from '../model/epic-duration.model';
+import { EpicDeliveryOverview } from '../model/epic-duration.model';
 
 
 @Injectable({ providedIn: 'root' })
@@ -21,9 +21,9 @@ export class JiraService {
     return this.http.get<SprintInfo>(`${this.baseUrl}/jira/sprints/${sprintId}/full-info`);
   }
 
-  getEpicDurationsBySprintAndVersion(projectKey: string, boardId: number): Observable<SprintVersionEpicDuration[]> {
-    return this.http.get<SprintVersionEpicDuration[]>(
-      `${this.baseUrl}/jira/projects/${projectKey}/boards/${boardId}/epics/durations`
+  getEpicDeliveriesByTeam(projectKey: string): Observable<EpicDeliveryOverview[]> {
+    return this.http.get<EpicDeliveryOverview[]>(
+      `${this.baseUrl}/jira/projects/${projectKey}/epics/deliveries`
     );
   }
 

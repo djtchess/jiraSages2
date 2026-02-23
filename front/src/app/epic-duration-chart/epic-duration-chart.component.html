@@ -6,29 +6,29 @@
   <div echarts [options]="chartOptions" class="chart"></div>
 
   <table mat-table [dataSource]="data" class="mat-elevation-z2 table">
-    <ng-container matColumnDef="sprintName">
-      <th mat-header-cell *matHeaderCellDef>Sprint</th>
-      <td mat-cell *matCellDef="let row">{{ row.sprintName }}</td>
+    <ng-container matColumnDef="epicKey">
+      <th mat-header-cell *matHeaderCellDef>Epic</th>
+      <td mat-cell *matCellDef="let row">{{ row.epicKey }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="versionName">
-      <th mat-header-cell *matHeaderCellDef>Version</th>
-      <td mat-cell *matCellDef="let row">{{ row.versionName }}</td>
+    <ng-container matColumnDef="epicSummary">
+      <th mat-header-cell *matHeaderCellDef>Résumé</th>
+      <td mat-cell *matCellDef="let row">{{ row.epicSummary }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="epicCount">
-      <th mat-header-cell *matHeaderCellDef>Nb épics</th>
-      <td mat-cell *matCellDef="let row">{{ row.epicCount }}</td>
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Statut</th>
+      <td mat-cell *matCellDef="let row">{{ row.status }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="totalDurationDays">
-      <th mat-header-cell *matHeaderCellDef>Durée totale (j)</th>
-      <td mat-cell *matCellDef="let row">{{ row.totalDurationDays }}</td>
+    <ng-container matColumnDef="versions">
+      <th mat-header-cell *matHeaderCellDef>Versions livrées</th>
+      <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="averageDurationDays">
-      <th mat-header-cell *matHeaderCellDef>Durée moyenne (j)</th>
-      <td mat-cell *matCellDef="let row">{{ row.averageDurationDays }}</td>
+    <ng-container matColumnDef="teamsAndSprints">
+      <th mat-header-cell *matHeaderCellDef>Équipes / Sprints</th>
+      <td mat-cell *matCellDef="let row">{{ formatTeamsAndSprints(row) }}</td>
     </ng-container>
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

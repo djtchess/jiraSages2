@@ -6,7 +6,7 @@ import { EChartsOption } from 'echarts';
 import { NgxEchartsModule, NGX_ECHARTS_CONFIG } from 'ngx-echarts';
 
 import { JiraService } from '../../service/jira.service';
-import { SprintVersionEpicDuration } from '../../model/epic-duration.model';
+import { EpicDeliveryOverview } from '../../model/epic-duration.model';
 
 @Component({
   selector: 'app-epic-duration-chart',
@@ -23,11 +23,10 @@ import { SprintVersionEpicDuration } from '../../model/epic-duration.model';
 })
 export class EpicDurationChartComponent implements OnInit, OnChanges {
   @Input() projectKey = 'SAG';
-  @Input() boardId = 6;
 
   isLoading = false;
-  data: SprintVersionEpicDuration[] = [];
-  displayedColumns: string[] = ['sprintName', 'versionName', 'epicCount', 'totalDurationDays', 'averageDurationDays'];
+  data: EpicDeliveryOverview[] = [];
+  displayedColumns: string[] = ['epicKey', 'epicSummary', 'status', 'versions', 'teamsAndSprints'];
   chartOptions: EChartsOption = {};
 
   constructor(private jiraService: JiraService) {}
@@ -37,14 +36,14 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if ((changes['projectKey'] || changes['boardId']) && this.projectKey && this.boardId) {
+    if (changes['projectKey'] && this.projectKey) {
       this.loadData();
     }
   }
 
   loadData(): void {
     this.isLoading = true;
-    this.jiraService.getEpicDurationsBySprintAndVersion(this.projectKey, this.boardId).subscribe({
+    this.jiraService.getEpicDeliveriesByTeam(this.projectKey).subscribe({
       next: (rows) => {
         this.data = rows;
         this.buildChart(rows);
@@ -58,43 +57,39 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     });
   }
 
-  private buildChart(rows: SprintVersionEpicDuration[]): void {
-    const sprintNames = Array.from(new Set(rows.map(r => r.sprintName)));
-    const versions = Array.from(new Set(rows.map(r => r.versionName)));
+  formatVersions(row: EpicDeliveryOverview): string {
+    return row.versionNames.join(', ');
+  }
 
-    const series: any[] = versions.map(version => ({
-      name: version,
+  formatTeamsAndSprints(row: EpicDeliveryOverview): string {
+    const grouped: Record<string, string[]> = {};
+    for (const delivery of row.sprintDeliveries) {
+      grouped[delivery.teamName] = grouped[delivery.teamName] || [];
+      grouped[delivery.teamName].push(delivery.sprintName);
+    }
+
+    return Object.entries(grouped)
+      .map(([team, sprints]) => `${team}: ${sprints.join(' / ')}`)
+      .join(' | ');
+  }
+
+  private buildChart(rows: EpicDeliveryOverview[]): void {
+    const epics = rows.map(r => r.epicKey);
+    const teams = Array.from(new Set(rows.flatMap(r => r.sprintDeliveries.map(d => d.teamName))));
+
+    const series: any[] = teams.map(team => ({
+      name: team,
       type: 'bar',
       stack: 'total',
-      emphasis: { focus: 'series' },
-      data: sprintNames.map(sprint => {
-        const row = rows.find(r => r.sprintName === sprint && r.versionName === version);
-        return row?.averageDurationDays ?? 0;
-      })
+      data: rows.map(row => row.sprintDeliveries.filter(d => d.teamName === team).length)
     }));
 
     this.chartOptions = {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' }
-      },
-      legend: {
-        type: 'scroll'
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'value',
-        name: 'Durée moyenne (jours)'
-      },
-      yAxis: {
-        type: 'category',
-        data: sprintNames
-      },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35 } },
+      yAxis: { type: 'value', name: 'Nombre de sprints de livraison' },
       series
     };
   }

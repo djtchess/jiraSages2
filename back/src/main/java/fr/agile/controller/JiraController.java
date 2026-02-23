@@ -5,6 +5,7 @@ import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.dto.SprintKpiInfo;
 import fr.agile.dto.SprintVersionEpicDurationDTO;
+import fr.agile.dto.EpicDeliveryOverviewDTO;
 import fr.agile.exception.JiraIntegrationException;
 import fr.agile.service.SprintService;
 import fr.agile.service.SprintStatsService;
@@ -110,6 +111,17 @@ public class JiraController {
             return sprintInfoDTO;
         } catch (Exception ex) {
             throw new JiraIntegrationException("Impossible de calculer les informations complètes du sprint.", ex);
+        }
+    }
+
+
+    @GetMapping(value = "/projects/{projectKey}/epics/deliveries", produces = "application/json")
+    public ResponseEntity<List<EpicDeliveryOverviewDTO>> getEpicDeliveriesByTeam(@PathVariable @NotBlank String projectKey) {
+        log.info("Récupération des épics avec sprints/équipes/version pour le projet {}", projectKey);
+        try {
+            return ResponseEntity.ok(jiraApiClient.getEpicDeliveriesByTeam(projectKey));
+        } catch (Exception ex) {
+            throw new JiraIntegrationException("Impossible de récupérer les épics avec équipes/sprints/versions.", ex);
         }
     }
 

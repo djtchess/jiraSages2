@@ -36,7 +36,9 @@ import fr.agile.dto.AvancementHistorique;
 import fr.agile.dto.BoardInfo;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.BurnupPointDTO;
+import fr.agile.dto.EpicDeliveryOverviewDTO;
 import fr.agile.dto.EpicDurationEntryDTO;
+import fr.agile.dto.EpicTeamSprintDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.entities.Developper;
 import fr.agile.entities.Event;
@@ -495,6 +497,71 @@ public class JiraApiClient {
         }
 
         return sprintList;
+    }
+
+
+    public List<EpicDeliveryOverviewDTO> getEpicDeliveriesByTeam(String projectKey) throws Exception {
+        List<BoardInfo> boards = getBoardsForProject(projectKey);
+
+        Map<Long, SprintInfoDTO> sprintById = new HashMap<>();
+        Map<Long, String> teamBySprintId = new HashMap<>();
+
+        for (BoardInfo board : boards) {
+            List<SprintInfoDTO> boardSprints = getAllSprintsForBoard(board.getId());
+            for (SprintInfoDTO sprint : boardSprints) {
+                sprintById.put(sprint.getId(), sprint);
+                teamBySprintId.put(sprint.getId(), board.getName());
+            }
+        }
+
+        List<JsonNode> epicIssues = searchIssuesByJql(
+                String.format("project = %s AND issuetype = Epic", projectKey),
+                List.of("key", "summary", "status", "fixVersions")
+        );
+
+        List<EpicDeliveryOverviewDTO> result = new ArrayList<>();
+        for (JsonNode issue : epicIssues) {
+            String epicKey = issue.path("key").asText();
+            JsonNode fields = issue.path("fields");
+
+            String epicSummary = fields.path("summary").asText("Sans résumé");
+            String status = fields.path("status").path("name").asText("Inconnu");
+
+            List<String> versions = new ArrayList<>();
+            JsonNode fixVersions = fields.path("fixVersions");
+            if (fixVersions.isArray()) {
+                for (JsonNode v : fixVersions) {
+                    String name = v.path("name").asText(null);
+                    if (name != null && !name.isBlank()) {
+                        versions.add(name);
+                    }
+                }
+            }
+            if (versions.isEmpty()) {
+                versions = List.of("Sans version");
+            }
+
+            Set<Long> sprintIds = getSprintIdsForEpicFromChildren(projectKey, epicKey);
+            List<EpicTeamSprintDTO> deliveries = sprintIds.stream()
+                    .map(id -> {
+                        SprintInfoDTO sprint = sprintById.get(id);
+                        if (sprint == null) {
+                            return null;
+                        }
+                        String teamName = teamBySprintId.getOrDefault(id, "Equipe inconnue");
+                        return new EpicTeamSprintDTO(teamName, id, sprint.getName());
+                    })
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(EpicTeamSprintDTO::teamName).thenComparing(EpicTeamSprintDTO::sprintId))
+                    .toList();
+
+            if (!deliveries.isEmpty()) {
+                result.add(new EpicDeliveryOverviewDTO(epicKey, epicSummary, status, versions, deliveries));
+            }
+        }
+
+        result.sort(Comparator.comparing(EpicDeliveryOverviewDTO::epicKey));
+        return result;
     }
 
     public List<SprintVersionEpicDurationDTO> getEpicDurationsByVersionForBoard(long boardId, String projectKey) throws Exception {

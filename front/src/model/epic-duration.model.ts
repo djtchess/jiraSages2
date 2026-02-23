@@ -1,16 +1,13 @@
-export interface EpicDurationEntry {
+export interface EpicTeamSprintDelivery {
+  teamName: string;
+  sprintId: number;
+  sprintName: string;
+}
+
+export interface EpicDeliveryOverview {
   epicKey: string;
   epicSummary: string;
   status: string;
-  durationDays: number;
-}
-
-export interface SprintVersionEpicDuration {
-  sprintId: number;
-  sprintName: string;
-  versionName: string;
-  epicCount: number;
-  totalDurationDays: number;
-  averageDurationDays: number;
-  epics: EpicDurationEntry[];
+  versionNames: string[];
+  sprintDeliveries: EpicTeamSprintDelivery[];
 }
