@@ -4,9 +4,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 import fr.agile.IssueChangelogData;
-import lombok.Builder;
-import lombok.Data;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Data;
@@ -27,7 +24,10 @@ public class Ticket {
     private Double avancement;
     private String engagementSprint;
     private String type;
+    private String summary;
     private String versionCorrigee;
+    private String epicKey;
+    private String epicName;
     private LocalDate createdDate;
     private List<String> sprintIds;
     private boolean devTermineAvantSprint;
@@ -47,6 +47,5 @@ public class Ticket {
     }
 
 }
-
 
 

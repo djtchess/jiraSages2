@@ -158,9 +158,12 @@ public class JiraApiClient {
             fieldsArray.add("key")
                     .add("assignee")
                     .add("status")
+                    .add("summary")
                     .add("created")
                     .add("fixVersions")
+                    .add("parent")
                     .add("issuetype")
+                    .add("customfield_10014")   // epic link (classic projects)
                     .add("customfield_10028")   // story points
                     .add("customfield_10126")   // avancement
                     .add("customfield_10020")   // sprint(s)
@@ -181,10 +184,33 @@ public class JiraApiClient {
                         : fields.path("assignee").path("displayName").asText();
 
                 String status = fields.path("status").path("name").asText("Inconnu");
+                String summary = fields.path("summary").asText("Sans résumé");
                 String storyPts = fields.path("customfield_10028").isNull() ? null : fields.path("customfield_10028").asText();
                 String avancement = fields.path("customfield_10126").isNull() ? null : fields.path("customfield_10126").asText();
                 String type = fields.path("issuetype").path("name").asText("Inconnu");
                 String url = JIRA_URL + "/browse/" + key;
+
+                String epicKey = null;
+                String epicName = null;
+                JsonNode parentNode = fields.path("parent");
+                if ("Epic".equalsIgnoreCase(type)) {
+                    epicKey = key;
+                    epicName = summary;
+                } else {
+                    JsonNode epicLinkNode = fields.path("customfield_10014");
+                    if (!epicLinkNode.isMissingNode() && !epicLinkNode.isNull()) {
+                        epicKey = epicLinkNode.asText(null);
+                    }
+
+                    if (!parentNode.isMissingNode() && !parentNode.isNull()) {
+                        JsonNode parentFields = parentNode.path("fields");
+                        String parentType = parentFields.path("issuetype").path("name").asText("");
+                        if ("Epic".equalsIgnoreCase(parentType)) {
+                            epicKey = parentNode.path("key").asText(epicKey);
+                            epicName = parentFields.path("summary").asText(null);
+                        }
+                    }
+                }
 
                 JsonNode customField = fields.path("customfield_10242");
                 String engagementSprint = null;
@@ -230,7 +256,10 @@ public class JiraApiClient {
                         .avancement(BurnupUtils.parseDouble(avancement))
                         .engagementSprint(engagementSprint)
                         .type(type)
+                        .summary(summary)
                         .versionCorrigee(versionCorrigee)
+                        .epicKey(epicKey)
+                        .epicName(epicName)
                         .createdDate(created)
                         .sprintIds(sprintIds)
                         .build();
@@ -250,6 +279,14 @@ public class JiraApiClient {
         }
 
         return ticketList;
+    }
+
+    public List<Ticket> getTicketsForSprint(String projectKey, long sprintId) throws IOException, InterruptedException {
+        String jql = new JqlBuilder()
+                .project(projectKey)
+                .and().raw("sprint = " + sprintId)
+                .build();
+        return getTicketsParJql(jql, ZonedDateTime.now(Z_PARIS), false);
     }
 
     // =====================================================================

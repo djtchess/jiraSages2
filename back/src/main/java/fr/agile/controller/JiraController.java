@@ -14,8 +14,10 @@ import org.slf4j.LoggerFactory;
 
 import fr.agile.JiraApiClient;
 import fr.agile.dto.BurnupDataDTO;
+import fr.agile.dto.EpicVersionSprintDurationDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.dto.SprintKpiInfo;
+import fr.agile.service.EpicVersionStatsService;
 import fr.agile.service.SprintService;
 import fr.agile.service.SprintStatsService;
 import fr.agile.utils.BurnupUtils;
@@ -30,6 +32,7 @@ public class JiraController {
     @Autowired private JiraApiClient jiraApiClient;
     @Autowired private SprintService sprintService;
     @Autowired private SprintStatsService sprintStatsService;
+    @Autowired private EpicVersionStatsService epicVersionStatsService;
 
     @GetMapping("/burnup/{sprintId}")
     public BurnupDataDTO getBurnupData(@PathVariable Long sprintId) throws Exception {
@@ -73,6 +76,13 @@ public class JiraController {
             }
         }
         return ResponseEntity.ok(sprints);
+    }
+
+
+    @GetMapping(value ="/projects/{projectKey}/epics-by-version", produces = "application/json")
+    public ResponseEntity<List<EpicVersionSprintDurationDTO>> getEpicsByVersion(@PathVariable String projectKey) throws Exception {
+        log.info("Récupération des epics par version pour le projet {}", projectKey);
+        return ResponseEntity.ok(epicVersionStatsService.getEpicDurationsByVersion(projectKey));
     }
 
 
