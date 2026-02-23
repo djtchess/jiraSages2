@@ -34,6 +34,123 @@ On trouve des conversions DTO/Entity faites dans les contrôleurs (`SprintMapper
 
 **Bénéfice**: séparation claire des responsabilités et réduction des effets de bord.
 
+### 1.3 Découpage en tâches (pas à pas) pour implémenter 1.1 et 1.2
+
+Ci-dessous un plan opérationnel en petites tâches livrables, pensé pour être exécuté sur plusieurs PR courtes.
+
+#### Epic A — Refactor `JiraApiClient` en façade orchestratrice
+
+**A1 — Cartographier les responsabilités actuelles (1 PR de préparation)**
+- Lister les méthodes de `JiraApiClient` par catégorie: HTTP, parsing, pagination, cache, logique métier.
+- Identifier les dépendances externes (ObjectMapper, RestTemplate/HttpClient, proxy, propriétés).
+- Produire un mini schéma de flux (appel contrôleur/service -> JiraApiClient -> Jira).
+
+**Critères d’acceptation**
+- Une documentation courte existe dans le repo (ou ADR) avec le périmètre exact à extraire.
+- Les zones à risque sont identifiées (méthodes les plus appelées, comportements de cache).
+
+---
+
+**A2 — Extraire `JiraHttpClient` (sans changer le comportement fonctionnel)**
+- Créer une classe dédiée aux appels HTTP Jira (GET/POST + gestion headers/auth).
+- Y déplacer: construction URL, timeout, retry, proxy, gestion status code.
+- Conserver `JiraApiClient` comme appelant de `JiraHttpClient`.
+
+**Critères d’acceptation**
+- `JiraApiClient` ne construit plus directement les requêtes HTTP.
+- Les tests existants passent et la signature publique de `JiraApiClient` reste stable.
+
+---
+
+**A3 — Extraire `JiraParser` (mapping JsonNode -> DTO/domain)**
+- Créer une classe dédiée à la désérialisation et aux conversions JSON.
+- Y déplacer les méthodes de parsing (issues, sprints, changelog, etc.).
+- Isoler les cas d’erreur de parsing dans des exceptions explicites.
+
+**Critères d’acceptation**
+- `JiraApiClient` ne manipule plus directement la structure JSON brute hors orchestration.
+- Des tests unitaires ciblent le parsing sur des payloads réels/fixtures.
+
+---
+
+**A4 — Extraire `ChangelogCacheService` (TTL + invalidation)**
+- Créer un service de cache encapsulant la stratégie de TTL.
+- Y déplacer les structures de cache et règles d’invalidation.
+- Exposer une API simple (`getOrLoad`, `evict`, `clearExpired`).
+
+**Critères d’acceptation**
+- Aucune structure de cache n’est maintenue directement dans `JiraApiClient`.
+- Comportement cache inchangé validé par tests unitaires.
+
+---
+
+**A5 — Simplifier `JiraApiClient` en façade d’orchestration**
+- Réduire `JiraApiClient` à la coordination entre `JiraHttpClient`, `JiraParser`, `ChangelogCacheService`.
+- Supprimer les méthodes privées devenues obsolètes.
+- Mettre à jour JavaDoc et diagramme de dépendances.
+
+**Critères d’acceptation**
+- `JiraApiClient` a une taille et une complexité réduites (méthodes plus courtes, responsabilités limitées).
+- Les tests d’intégration de l’appel Jira restent au vert.
+
+---
+
+#### Epic B — Clarifier le contrat Controller ↔ Service ↔ Mapper
+
+**B1 — Définir la règle d’architecture cible**
+- Règle: le contrôleur gère HTTP + validation uniquement.
+- Règle: les mappings DTO/Entity sont appelés dans les services applicatifs.
+- Documenter ces règles dans une section “Conventions d’architecture”.
+
+**Critères d’acceptation**
+- Une convention écrite est partagée et validée par l’équipe.
+- Les nouveaux développements doivent suivre cette règle.
+
+---
+
+**B2 — Migrer `SprintController` vers un contrôleur mince**
+- Déplacer les appels directs à `SprintMapper` du contrôleur vers `SprintService`.
+- Adapter la signature du service pour retourner des DTO prêts pour la réponse HTTP.
+- Conserver les validations d’entrée côté contrôleur (`@Valid`, vérifications de params).
+
+**Critères d’acceptation**
+- `SprintController` ne dépend plus de `SprintMapper`.
+- Le comportement des endpoints reste identique (contrat JSON inchangé).
+
+---
+
+**B3 — Répliquer le modèle sur les autres contrôleurs**
+- Scanner les contrôleurs restants et identifier les appels mapper/transformations métier.
+- Déplacer ces transformations dans les services associés.
+- Nettoyer les imports et dépendances inutiles dans la couche web.
+
+**Critères d’acceptation**
+- Les contrôleurs ne contiennent plus de logique métier ni mapping complexe.
+- Les services centralisent les règles de transformation.
+
+---
+
+**B4 — Ajouter des garde-fous de non-régression architecturelle**
+- Ajouter des tests d’architecture (ex: ArchUnit) pour interdire `controller -> mapper` direct si souhaité.
+- Ajouter une checklist PR: “contrôleur mince”, “mapping en service”, “pas de logique métier en web”.
+
+**Critères d’acceptation**
+- Une PR violant la règle remonte une alerte (test ou revue structurée).
+
+---
+
+#### Ordonnancement conseillé (2 à 3 semaines)
+
+1. **Semaine 1**: A1, A2, B1
+2. **Semaine 2**: A3, B2
+3. **Semaine 3**: A4, A5, B3, B4
+
+#### Définition de “Done” (globale)
+- Tous les tests existants + nouveaux tests unitaires passent.
+- Aucun endpoint fonctionnellement cassé.
+- La dette de responsabilité de `JiraApiClient` est réduite et mesurable.
+- Les contrôleurs sont minces et les mappings sont déplacés en service.
+
 ---
 
 ## 2) Sécurité & configuration
