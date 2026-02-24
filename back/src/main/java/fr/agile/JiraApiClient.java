@@ -20,6 +20,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -57,6 +62,12 @@ public class JiraApiClient {
     @Value("${jira.baseUrl}")
     private String JIRA_URL;
 
+    @Value("${jira.changelog.parallelism:4}")
+    private int changelogParallelism;
+
+    @Value("${jira.changelog.maxQps:8}")
+    private int changelogMaxQps;
+
     private static final String SEARCH_JQL_API = "/rest/api/3/search/jql";
 
     private static final ZoneId Z_PARIS = ZoneId.of("Europe/Paris");
@@ -78,6 +89,8 @@ public class JiraApiClient {
     private final JiraParser jiraParser;
     private final ChangelogCacheService changelogCacheService;
     private final JiraSprintAnalysisService jiraSprintAnalysisService;
+    private final Object changelogRateLimitLock = new Object();
+    private long nextChangelogSlotNanos = 0L;
 
     public JiraApiClient(SprintService sprintService,
                          DevelopperService developpeurService,
@@ -125,25 +138,10 @@ public class JiraApiClient {
             String response = jiraHttpClient.sendRequest(request);
             JiraParser.TicketPage ticketPage = jiraParser.parseTicketPage(response, JIRA_URL);
 
-            for (Ticket t : ticketPage.tickets()) {
-                String key = t.getTicketKey();
-
-                // Filtrage "Dev terminé avant le sprint"
-                boolean devAvantSprint = false;
-                if (ticketDevAvantSprint) {
-                    try {
-                        IssueChangelogData ch = getChangelogCached(key);
-                        devAvantSprint = jiraSprintAnalysisService.isDevTermineAvantSprint(ch, sprintStartDate);
-                    } catch (Exception e) {
-                        devAvantSprint = false; // ne filtre pas si erreur changelog
-                    }
-                }
-
-                if (devAvantSprint) {
-                    t.setDevTermineAvantSprint(true);
-                } else {
-                    ticketList.add(t);
-                }
+            if (ticketDevAvantSprint) {
+                ticketList.addAll(filterTicketsWithChangelog(ticketPage.tickets(), sprintStartDate));
+            } else {
+                ticketList.addAll(ticketPage.tickets());
             }
 
             isLast = ticketPage.isLast();
@@ -151,6 +149,48 @@ public class JiraApiClient {
         }
 
         return ticketList;
+    }
+
+    private List<Ticket> filterTicketsWithChangelog(List<Ticket> tickets, ZonedDateTime sprintStartDate) {
+        if (tickets.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        int poolSize = Math.max(1, Math.min(changelogParallelism, tickets.size()));
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+        try {
+            List<CompletableFuture<TicketFilterResult>> futures = tickets.stream()
+                    .map(ticket -> CompletableFuture.supplyAsync(() -> evaluateTicket(ticket, sprintStartDate), executor))
+                    .toList();
+
+            List<Ticket> filtered = new ArrayList<>(tickets.size());
+            for (CompletableFuture<TicketFilterResult> future : futures) {
+                TicketFilterResult result;
+                try {
+                    result = future.join();
+                } catch (CompletionException e) {
+                    continue;
+                }
+                if (result.devTermineAvantSprint()) {
+                    result.ticket().setDevTermineAvantSprint(true);
+                } else {
+                    filtered.add(result.ticket());
+                }
+            }
+            return filtered;
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    private TicketFilterResult evaluateTicket(Ticket ticket, ZonedDateTime sprintStartDate) {
+        try {
+            IssueChangelogData changelog = getChangelogCached(ticket.getTicketKey());
+            boolean devAvantSprint = jiraSprintAnalysisService.isDevTermineAvantSprint(changelog, sprintStartDate);
+            return new TicketFilterResult(ticket, devAvantSprint);
+        } catch (Exception e) {
+            return new TicketFilterResult(ticket, false);
+        }
     }
 
     // =====================================================================
@@ -191,6 +231,7 @@ public class JiraApiClient {
         boolean hasMore = true;
 
         while (hasMore) {
+            throttleChangelogRequests();
             String url = JIRA_URL + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt + "&maxResults=" + maxResults;
             HttpRequest request = jiraHttpClient.createRequest(url);
             String body = jiraHttpClient.sendRequest(request);
@@ -209,6 +250,24 @@ public class JiraApiClient {
         avancementHistorique.sort(Comparator.comparing(a -> ZonedDateTime.parse(a.getDate(), JIRA_DATE_FORMATTER)));
 
         return new IssueChangelogData(avancementHistorique, statusParDate, sprintHistories);
+    }
+
+    private void throttleChangelogRequests() throws InterruptedException {
+        if (changelogMaxQps <= 0) {
+            return;
+        }
+        long intervalNanos = TimeUnit.SECONDS.toNanos(1) / changelogMaxQps;
+        synchronized (changelogRateLimitLock) {
+            long now = System.nanoTime();
+            if (nextChangelogSlotNanos > now) {
+                TimeUnit.NANOSECONDS.sleep(nextChangelogSlotNanos - now);
+                now = System.nanoTime();
+            }
+            nextChangelogSlotNanos = Math.max(nextChangelogSlotNanos, now) + intervalNanos;
+        }
+    }
+
+    private record TicketFilterResult(Ticket ticket, boolean devTermineAvantSprint) {
     }
     // =====================================================================
     // Aide "dev terminé avant le sprint"
