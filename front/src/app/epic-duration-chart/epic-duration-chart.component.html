@@ -3,6 +3,13 @@
 </div>
 
 <div *ngIf="!isLoading" class="epic-view">
+  <div class="epic-hero">
+    <div>
+      <h2>Durée épics · Analyse futuriste</h2>
+      <p class="epic-subtitle">Visualisez la charge, les story points et la distribution des efforts par epic.</p>
+    </div>
+  </div>
+
   <div class="kpis">
     <div class="kpi-card"><span class="kpi-label">Epics affichés</span><span class="kpi-value">{{ filteredData.length }}</span></div>
     <div class="kpi-card"><span class="kpi-label">Versions disponibles</span><span class="kpi-value">{{ allVersions.length }}</span></div>
@@ -29,7 +36,9 @@
     <button class="export-btn" (click)="exportStandaloneHtml()">Exporter une page HTML autonome</button>
   </div>
 
-  <div echarts [options]="chartOptions" class="chart"></div>
+  <div class="chart-wrap">
+    <div echarts [options]="chartOptions" class="chart"></div>
+  </div>
 
   <div class="table-card">
     <table mat-table [dataSource]="filteredData" class="mat-elevation-z0 table modern-table">
@@ -77,7 +86,9 @@
 
   <div *ngIf="selectedEpic" class="detail-panel">
     <h3>Détails tickets enfants - {{ selectedEpic.epicKey }}</h3>
-    <div echarts [options]="ticketWorklogChartOptions" class="chart small"></div>
+    <div class="chart-wrap">
+      <div echarts [options]="ticketWorklogChartOptions" class="chart small"></div>
+    </div>
 
     <div class="table-card">
       <table mat-table [dataSource]="selectedEpic.childTickets" class="mat-elevation-z0 table modern-table">

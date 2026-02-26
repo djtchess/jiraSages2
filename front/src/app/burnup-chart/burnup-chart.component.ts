@@ -123,17 +123,23 @@ export class BurnupChartComponent implements OnChanges, OnInit, OnDestroy {
       return pointDate <= today ? p.donePoints : null;
     });
 
+    const velocities = data.points.map((p: any) => Number(p.velocity ?? 0));
+
     this.chartOptions = {
       textStyle: { color: text },
       tooltip: { trigger: 'axis' },
-      legend: { data: ['Réalisé', 'Capacité', 'Charge totale'], textStyle: { color: text } },
+      legend: { data: ['Réalisé', 'Capacité', 'Charge totale', 'Vélocité (pts/JH)'], textStyle: { color: text } },
       grid: { left: '4%', right: '4%', bottom: '10%', containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { color: text }, axisLine: { lineStyle: { color: grid } } },
-      yAxis: { type: 'value', axisLabel: { color: text }, splitLine: { lineStyle: { color: grid } } },
+      yAxis: [
+        { type: 'value', name: 'Points', nameTextStyle: { color: text }, axisLabel: { color: text }, splitLine: { lineStyle: { color: grid } } },
+        { type: 'value', name: 'Vélocité', nameTextStyle: { color: text }, axisLabel: { color: text }, splitLine: { show: false } }
+      ],
       series: [
         { name: 'Réalisé', type: 'line', data: done, smooth: true, symbol: 'circle', symbolSize: 7, lineStyle: { width: 3, color: '#35d6ff' }, itemStyle: { color: '#35d6ff' } },
         { name: 'Capacité', type: 'line', data: data.points.map((p: any) => p.capacity), smooth: true, symbol: 'none', lineStyle: { type: 'dotted', width: 2, color: '#7ca8ff' } },
-        { name: 'Charge totale', type: 'line', data: data.points.map(() => data.totalStoryPoints), symbol: 'none', lineStyle: { type: 'dashed', width: 2, color: '#f26b88' } }
+        { name: 'Charge totale', type: 'line', data: data.points.map(() => data.totalStoryPoints), symbol: 'none', lineStyle: { type: 'dashed', width: 2, color: '#f26b88' } },
+        { name: 'Vélocité (pts/JH)', type: 'bar', yAxisIndex: 1, data: velocities, barMaxWidth: 16, itemStyle: { color: 'rgba(126, 242, 255, 0.42)', borderColor: '#7ef2ff', borderWidth: 1 } }
       ]
     };
 

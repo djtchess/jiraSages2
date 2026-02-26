@@ -42,6 +42,8 @@ $light-theme: mat.m2-define-light-theme((
   --shadow: 0 18px 45px rgba(43, 72, 136, 0.14);
   --chart-grid: rgba(72, 98, 150, 0.22);
   --chart-label: #465b83;
+  --btn-fg-on-accent: #f7fbff;
+  --btn-fg-on-light: #0f1f38;
 }
 
 html, body { height: 100%; }
@@ -82,6 +84,8 @@ body.dark-mode {
   --shadow: 0 22px 55px rgba(0, 0, 0, 0.42);
   --chart-grid: rgba(129, 166, 236, 0.2);
   --chart-label: #b7cbef;
+  --btn-fg-on-accent: #08142f;
+  --btn-fg-on-light: #dce7ff;
 }
 
 .main-content {
@@ -94,7 +98,12 @@ body.dark-mode {
 .kpi-card,
 .calendar-container,
 .info-box,
-.ticket-table-container {
+.ticket-table-container,
+.filters,
+.table-card,
+.detail-panel,
+.epic-view,
+.chart-wrap {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -103,14 +112,64 @@ body.dark-mode {
   backdrop-filter: blur(10px);
 }
 
+button,
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-stroked-button,
+.mat-mdc-outlined-button,
+.mat-mdc-icon-button,
+.save-btn,
+.reset-btn,
+.export-btn {
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px;
+  transition: transform .18s ease, box-shadow .22s ease, filter .22s ease;
+}
+
+button:hover,
+.mat-mdc-button:hover,
+.mat-mdc-raised-button:hover,
+.mat-mdc-unelevated-button:hover,
+.mat-mdc-stroked-button:hover,
+.mat-mdc-outlined-button:hover,
+.save-btn:hover,
+.reset-btn:hover,
+.export-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.save-btn,
+.reset-btn,
+.export-btn {
+  background: linear-gradient(92deg, var(--accent), var(--accent-2)) !important;
+  color: var(--btn-fg-on-accent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, #ffffff 10%) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+
+.mat-mdc-stroked-button,
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  background: color-mix(in srgb, var(--surface-muted) 84%, transparent) !important;
+  color: var(--btn-fg-on-light) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.mat-mdc-icon-button {
+  color: var(--btn-fg-on-light) !important;
+  background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
+}
+
 .mdc-data-table__cell,
 .mdc-data-table__header-cell,
 .mat-mdc-select-value-text,
 .mdc-text-field__input,
-.mat-mdc-paginator,
-.mat-mdc-icon-button,
-.mat-mdc-button,
-.mat-mdc-raised-button {
+.mat-mdc-paginator {
   color: var(--text) !important;
 }
 
