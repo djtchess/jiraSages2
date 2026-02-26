@@ -31,85 +31,84 @@
 
   <div echarts [options]="chartOptions" class="chart"></div>
 
-  <table mat-table [dataSource]="filteredData" class="mat-elevation-z2 table">
-    <ng-container matColumnDef="epicKey">
-      <th mat-header-cell *matHeaderCellDef>Epic</th>
-      <td mat-cell *matCellDef="let row">
-        <a href="#" (click)="$event.preventDefault(); selectEpic(row)">{{ row.epicKey }}</a>
-      </td>
-    </ng-container>
+  <div class="table-card">
+    <table mat-table [dataSource]="filteredData" class="mat-elevation-z0 table modern-table">
+      <ng-container matColumnDef="epicKey">
+        <th mat-header-cell *matHeaderCellDef>Epic</th>
+        <td mat-cell *matCellDef="let row">
+          <a href="#" (click)="$event.preventDefault(); selectEpic(row)">{{ row.epicKey }}</a>
+        </td>
+      </ng-container>
 
-    <ng-container matColumnDef="epicSummary">
-      <th mat-header-cell *matHeaderCellDef>Résumé</th>
-      <td mat-cell *matCellDef="let row">{{ row.epicSummary }}</td>
-    </ng-container>
+      <ng-container matColumnDef="epicSummary">
+        <th mat-header-cell *matHeaderCellDef>Résumé</th>
+        <td mat-cell *matCellDef="let row">{{ row.epicSummary }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="status">
-      <th mat-header-cell *matHeaderCellDef>Statut</th>
-      <td mat-cell *matCellDef="let row">{{ row.status }}</td>
-    </ng-container>
+      <ng-container matColumnDef="versions">
+        <th mat-header-cell *matHeaderCellDef>Versions (tickets enfants)</th>
+        <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="versions">
-      <th mat-header-cell *matHeaderCellDef>Versions (tickets enfants)</th>
-      <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
-    </ng-container>
+      <ng-container matColumnDef="storyPoints">
+        <th mat-header-cell *matHeaderCellDef>Story Points</th>
+        <td mat-cell *matCellDef="let row">{{ row.totalStoryPoints | number:'1.2-2' }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="storyPoints">
-      <th mat-header-cell *matHeaderCellDef>Story Points</th>
-      <td mat-cell *matCellDef="let row">{{ row.totalStoryPoints | number:'1.2-2' }}</td>
-    </ng-container>
+      <ng-container matColumnDef="days">
+        <th mat-header-cell *matHeaderCellDef>Temps (jours)</th>
+        <td mat-cell *matCellDef="let row">{{ row.totalTimeSpentDays | number:'1.2-2' }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="days">
-      <th mat-header-cell *matHeaderCellDef>Temps (jours)</th>
-      <td mat-cell *matCellDef="let row">{{ row.totalTimeSpentDays | number:'1.2-2' }}</td>
-    </ng-container>
+      <ng-container matColumnDef="developers">
+        <th mat-header-cell *matHeaderCellDef>Développeurs epic</th>
+        <td mat-cell *matCellDef="let row">{{ formatDevelopers(row) }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="developers">
-      <th mat-header-cell *matHeaderCellDef>Développeurs epic</th>
-      <td mat-cell *matCellDef="let row">{{ formatDevelopers(row) }}</td>
-    </ng-container>
+      <ng-container matColumnDef="tickets">
+        <th mat-header-cell *matHeaderCellDef>Tickets enfants</th>
+        <td mat-cell *matCellDef="let row">{{ row.childTickets?.length || 0 }}</td>
+      </ng-container>
 
-    <ng-container matColumnDef="tickets">
-      <th mat-header-cell *matHeaderCellDef>Tickets enfants</th>
-      <td mat-cell *matCellDef="let row">{{ row.childTickets?.length || 0 }}</td>
-    </ng-container>
-
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-  </table>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  </div>
 
   <div *ngIf="selectedEpic" class="detail-panel">
     <h3>Détails tickets enfants - {{ selectedEpic.epicKey }}</h3>
     <div echarts [options]="ticketWorklogChartOptions" class="chart small"></div>
 
-    <table mat-table [dataSource]="selectedEpic.childTickets" class="mat-elevation-z2 table">
-      <ng-container matColumnDef="ticketKey">
-        <th mat-header-cell *matHeaderCellDef>Ticket</th>
-        <td mat-cell *matCellDef="let t"><a [href]="t.ticketUrl" target="_blank" rel="noopener">{{ t.ticketKey }}</a></td>
-      </ng-container>
-      <ng-container matColumnDef="summary">
-        <th mat-header-cell *matHeaderCellDef>Résumé</th>
-        <td mat-cell *matCellDef="let t">{{ t.summary }}</td>
-      </ng-container>
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>Statut ticket</th>
-        <td mat-cell *matCellDef="let t">{{ t.status }}</td>
-      </ng-container>
-      <ng-container matColumnDef="storyPoints">
-        <th mat-header-cell *matHeaderCellDef>Story Points</th>
-        <td mat-cell *matCellDef="let t">{{ t.storyPoints | number:'1.2-2' }}</td>
-      </ng-container>
-      <ng-container matColumnDef="timeSpentDays">
-        <th mat-header-cell *matHeaderCellDef>Temps passé (j)</th>
-        <td mat-cell *matCellDef="let t">{{ t.timeSpentDays | number:'1.2-2' }}</td>
-      </ng-container>
-      <ng-container matColumnDef="developers">
-        <th mat-header-cell *matHeaderCellDef>Développeurs</th>
-        <td mat-cell *matCellDef="let t">{{ t.developers.join(', ') }}</td>
-      </ng-container>
+    <div class="table-card">
+      <table mat-table [dataSource]="selectedEpic.childTickets" class="mat-elevation-z0 table modern-table">
+        <ng-container matColumnDef="ticketKey">
+          <th mat-header-cell *matHeaderCellDef>Ticket</th>
+          <td mat-cell *matCellDef="let t"><a [href]="t.ticketUrl" target="_blank" rel="noopener">{{ t.ticketKey }}</a></td>
+        </ng-container>
+        <ng-container matColumnDef="summary">
+          <th mat-header-cell *matHeaderCellDef>Résumé</th>
+          <td mat-cell *matCellDef="let t">{{ t.summary }}</td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Statut ticket</th>
+          <td mat-cell *matCellDef="let t">{{ t.status }}</td>
+        </ng-container>
+        <ng-container matColumnDef="storyPoints">
+          <th mat-header-cell *matHeaderCellDef>Story Points</th>
+          <td mat-cell *matCellDef="let t">{{ t.storyPoints | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="timeSpentDays">
+          <th mat-header-cell *matHeaderCellDef>Temps passé (j)</th>
+          <td mat-cell *matCellDef="let t">{{ t.timeSpentDays | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="developers">
+          <th mat-header-cell *matHeaderCellDef>Développeurs</th>
+          <td mat-cell *matCellDef="let t">{{ t.developers.join(', ') }}</td>
+        </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
-      <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
-    </table>
+        <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
+      </table>
+    </div>
   </div>
 </div>
