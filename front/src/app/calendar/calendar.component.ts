@@ -23,18 +23,17 @@ import { MAT_DATE_FORMATS, MAT_NATIVE_DATE_FORMATS, provideNativeDateAdapter } f
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { OverlayContainer } from '@angular/cdk/overlay';
 
-import { forkJoin, of, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 
 /* === Domain models & utils === */
 import { CalendarVO } from '../../model/CalendarVO';
 import { Month, Resource, Holiday, Event } from '../../model/Resource';
 
 import { CalendarService } from '../../service/calendar.service';
-import { HolidayService } from '../../service/HolidayService';
-import { ResourceService } from '../../service/resource.service';
+import { CalendarCacheService } from '../../service/calendar-cache.service';
+import { CalendarExportService } from '../../service/calendar-export.service';
+import { CalendarFacadeService } from '../../service/calendar-facade.service';
 import { DateUtils } from '../utils/date-utils';
-import html2pdf from 'html2pdf.js';
-import { EventService } from '../../service/event.service';
 
 /* -------------------------------------------------------------------------- */
 /*                                 Component                                  */
@@ -64,7 +63,6 @@ export class CalendarComponent implements OnInit, OnDestroy {
   /* ---------------------------------------------------------------------- */
   DateUtils = DateUtils;
   Math = Math;
-  MAX_CACHE_MONTHS = 6;   // garde au plus 6 mois en mémoire
 
   /* ---------------------------------------------------------------------- */
   /* 🔗 ViewChild                                                            */
@@ -86,13 +84,6 @@ export class CalendarComponent implements OnInit, OnDestroy {
   /* ---------------------------------------------------------------------- */
   /* ⚙️  Caches & maps                                                       */
   /* ---------------------------------------------------------------------- */
-  /**
-   * Cache des spans par mois sous la forme "YYYY-MM" → Map<prenomResource, EventSpan[]>
-   * Permet d'éviter un recalcul coûteux à chaque navigation.
-   */
-  spanCache = new Map<string, Map<string, EventSpan[]>>();
-  /** Présences calculées : prenomResource → (indexMois → nb jours) */
-  private presenceDaysCache = new Map<string, Map<number, number>>();
 
   /* ---------------------------------------------------------------------- */
   /* 🎨 UI state                                                             */
@@ -111,9 +102,9 @@ export class CalendarComponent implements OnInit, OnDestroy {
   /* ---------------------------------------------------------------------- */
   constructor(
     private readonly calendarSvc: CalendarService,
-    private readonly resourceSvc: ResourceService,
-    private readonly eventSvc: EventService,
-    private readonly holidaySvc: HolidayService,
+    private readonly calendarFacade: CalendarFacadeService,
+    private readonly calendarCache: CalendarCacheService,
+    private readonly calendarExport: CalendarExportService,
     private readonly dialog: MatDialog,
     private readonly overlay: OverlayContainer,
     private readonly cdr: ChangeDetectorRef
@@ -146,24 +137,9 @@ export class CalendarComponent implements OnInit, OnDestroy {
 
   private fetchInitial(): void {
     this.dataSub?.unsubscribe();
-    this.dataSub = forkJoin({
-      resources: this.resourceSvc.getResources(),
-      holidays:  of(this.holidaySvc.getHolidays(this.currentYear))
-    }).subscribe(({ resources, holidays }) => {
-      // normalise les dates des events
-      resources.forEach(r => r.events.forEach(e => {
-        e.dateDebutEvent = new Date(`${e.dateDebutEvent}T00:00:00`);
-        e.dateFinEvent   = new Date(`${e.dateFinEvent}T00:00:00`);
-      }));
-
-  
-    resources.forEach(r => {
-        r.prenomResource = r.prenomResource.replace('Assih Jean-Samuel', 'Jean-Samuel');
-  
-    });
-
+    this.dataSub = this.calendarFacade.loadInitialData(this.currentYear).subscribe(({ resources, holidays }) => {
       this.resources = resources;
-      this.holidays  = holidays;
+      this.holidays = holidays;
       this.buildCalendar();
     });
   }
@@ -199,49 +175,21 @@ export class CalendarComponent implements OnInit, OnDestroy {
       const firstDate = vo.dates[0];
       const key = `${firstDate.getFullYear()}-${firstDate.getMonth() + 1}`;
 
-      if (!this.spanCache.has(key)) {
-        this.spanCache.set(key,
-          this.calendarSvc.buildSpansForMonth(vo.dates, activeRes)
-        );
-        // this.trimSpanCache();
-      }
+      this.calendarCache.ensureMonthSpans(key, vo.dates, activeRes, this.calendarSvc.buildSpansForMonth.bind(this.calendarSvc));
     });
 
-    this.computePresence(this.getDisplayedMonthKeys());
+    this.recomputePresence();
     this.cdr.markForCheck();
   }
 
   /** Renvoie la liste des spans pour une ressource et un mois */
   getSpans(resource: Resource, monthIdx: number): EventSpan[] {
     const key = this.voKey(monthIdx);
-    return this.spanCache.get(key)?.get(resource.prenomResource) ?? [];
+    return this.calendarCache.getSpans(key, resource.prenomResource);
   }
 
-  /**
-   * Recalcule la présence à partir du cache de spans.
-   */
-  private computePresence(_ignored?: string[]): void {
-    this.presenceDaysCache.clear();
-
-    // Les clés dans l’ordre d’affichage
-    const orderedKeys = this.getDisplayedMonthKeys();
-
-    for (const res of this.activeResources) {
-      const monthMap = new Map<number, number>();
-
-      orderedKeys.forEach((key, displayIdx) => {
-        const spans = this.spanCache.get(key)?.get(res.prenomResource) ?? [];
-        let total = 0;
-        spans.forEach(s => {
-          const d = s.date;
-          const working = DateUtils.isWeekend(d) || d.isHoliday() || d.isInactif(res) || (d.isEvent(res) && !d.isDemiJourneeEvent(res));
-          if (!working) total += d.isDemiJourneeEvent(res) ? 0.5 : 1;
-        });
-        monthMap.set(displayIdx, total);
-      });
-
-      this.presenceDaysCache.set(res.prenomResource, monthMap);
-    }
+  private recomputePresence(): void {
+    this.calendarCache.computePresence(this.getDisplayedMonthKeys(), this.activeResources);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -290,7 +238,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
           return;
         }
 
-        this.eventSvc.deleteEvent(id).subscribe({
+        this.calendarFacade.deleteEvent(id).subscribe({
           next: () => {
             // 1) Retire localement l’event
             res.events = res.events.filter(e => (e as any).id !== id && (e as any).idEvent !== id);
@@ -302,7 +250,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
             const keys  = this.calcMonthKeys(start, end);
 
             // 3) Invalide et reconstruit
-            keys.forEach(k => this.invalidateMonthCache(k));
+            keys.forEach(k => this.calendarCache.invalidateMonth(k));
             this.rebuildMonths(keys);
           },
           error: (err) => {
@@ -348,7 +296,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
         const dd = String(x.getDate()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
       }
-      this.eventSvc.saveEvent({
+      this.calendarFacade.saveEvent({
         ...ev,
         dateDebutEvent: toYMDLocal(ev.dateDebutEvent!),
         dateFinEvent:   toYMDLocal(ev.dateFinEvent!),
@@ -375,7 +323,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
           for (let d = new Date(saved.dateDebutEvent); d <= saved.dateFinEvent; d.setMonth(d.getMonth()+1, 1)) {
             keys.add(`${d.getFullYear()}-${d.getMonth()+1}`);
           }
-          keys.forEach(k => this.invalidateMonthCache(k));
+          keys.forEach(k => this.calendarCache.invalidateMonth(k));
 
           /* 4️⃣  reconstruit le calendrier */
           this.rebuildMonths(keys);
@@ -385,7 +333,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
           console.error('saveEvent failed', err);
           /* rollback : retire l’event optimiste si besoin */
           res.events = res.events.filter(e => e !== ev);
-          this.invalidateMonthCache(key);
+          this.calendarCache.invalidateMonth(key);
           this.buildCalendar();
         }
       });
@@ -418,33 +366,17 @@ export class CalendarComponent implements OnInit, OnDestroy {
       vo.dayLabels  = dates.map(d => d.getDate().toString().padStart(2, '0'));
 
       // spans mis en cache (après invalidation)
-      this.spanCache.set(
-        voKey,
-        this.calendarSvc.buildSpansForMonth(dates, this.activeResources)
-      );
+      this.calendarCache.setMonthSpans(voKey, this.calendarSvc.buildSpansForMonth(dates, this.activeResources));
     });
 
     /** 2) Recalcule la présence seulement pour ces mois */
-    this.computePresence(this.getDisplayedMonthKeys());
+    this.recomputePresence();
     this.cdr.markForCheck();
   }
 
   exportPdf(): void {
     if (!this.calendarRef) return;
-    const el = this.calendarRef.nativeElement;
-    el.classList.add('pdf-export');
-
-    html2pdf()
-      .from(el)
-      .set({
-        margin: 5,
-        filename: `calendrier_${this.currentYear}_${this.selectedMonth}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      })
-      .save()
-      .finally(() => el.classList.remove('pdf-export'));
+    this.calendarExport.exportCalendarAsPdf(this.calendarRef.nativeElement, this.currentYear, this.selectedMonth);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -465,7 +397,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
   }
 
   getPresenceDays(res: Resource, idx: number): number {
-    return this.presenceDaysCache.get(res.prenomResource)?.get(idx) ?? 0;
+    return this.calendarCache.getPresenceDays(res.prenomResource, idx);
   }
 
   private getDisplayedMonthKeys(): string[] {
@@ -487,19 +419,6 @@ export class CalendarComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  /** Supprime les clés les plus anciennes si spanCache dépasse MAX_CACHE_MONTHS */
-  private trimSpanCache(): void {
-    while (this.spanCache.size > this.MAX_CACHE_MONTHS) {
-      const oldestKey = [...this.spanCache.keys()]
-        .sort((a, b) => {
-          const [yA, mA] = a.split('-').map(Number);
-          const [yB, mB] = b.split('-').map(Number);
-          return yA !== yB ? yA - yB : mA - mB;
-        })[0];
-
-      this.spanCache.delete(oldestKey);
-    }
-  }
 
   /** Retourne la clé cache `YYYY-MM` pour l’index de mois affiché (0,1,2) */
   voKey(idx: number): string {
@@ -511,7 +430,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
   /* ---------------------------------------------------------------------- */
   /* ✔ Utilities                                                           */
   /* ---------------------------------------------------------------------- */
-  invalidateMonthCache(key: string): void { this.spanCache.delete(key); }
+  invalidateMonthCache(key: string): void { this.calendarCache.invalidateMonth(key); }
 }
 
 /* -------------------------------------------------------------------------- */
