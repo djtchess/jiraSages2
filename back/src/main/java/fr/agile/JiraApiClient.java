@@ -22,6 +22,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +74,7 @@ public class JiraApiClient {
     private static final String SEARCH_JQL_API = "/rest/api/3/search/jql";
 
     private static final ZoneId Z_PARIS = ZoneId.of("Europe/Paris");
+    private static final String EPIC_MIN_VERSION = "8.0.0";
     private static final DateTimeFormatter JIRA_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX");
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -553,7 +556,7 @@ public class JiraApiClient {
                 if (fixVersions.isArray()) {
                     for (JsonNode versionNode : fixVersions) {
                         String name = versionNode.path("name").asText(null);
-                        if (name != null && !name.isBlank()) {
+                        if (name != null && !name.isBlank() && isVersionAtLeast(name, EPIC_MIN_VERSION)) {
                             versionSet.add(name);
                         }
                     }
@@ -660,6 +663,9 @@ public class JiraApiClient {
                 if (fixVersions.isArray() && fixVersions.size() > 0) {
                     for (JsonNode versionNode : fixVersions) {
                         String versionName = versionNode.path("name").asText("Sans version");
+                        if (!isVersionAtLeast(versionName, EPIC_MIN_VERSION)) {
+                            continue;
+                        }
                         epicsByVersion
                                 .computeIfAbsent(versionName, ignored -> new ArrayList<>())
                                 .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays, sprintIds.stream().sorted().toList()));
@@ -701,13 +707,50 @@ public class JiraApiClient {
     }
 
     private List<JsonNode> getChildIssuesForEpic(String projectKey, String epicKey, List<String> fields) throws Exception {
-        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"", projectKey, epicKey);
+        String versionFilter = String.format(" AND fixVersion >= \"%s\"", EPIC_MIN_VERSION);
+        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"%s", projectKey, epicKey, versionFilter);
         try {
             return searchIssuesByJql(epicLinkJql, fields);
         } catch (Exception ex) {
-            String parentJql = String.format("project = %s AND parent = \"%s\"", projectKey, epicKey);
+            String parentJql = String.format("project = %s AND parent = \"%s\"%s", projectKey, epicKey, versionFilter);
             return searchIssuesByJql(parentJql, fields);
         }
+    }
+
+    private boolean isVersionAtLeast(String candidate, String minimum) {
+        if (candidate == null || candidate.isBlank()) {
+            return false;
+        }
+
+        int[] candidateVersion = extractSemver(candidate);
+        int[] minimumVersion = extractSemver(minimum);
+        if (candidateVersion == null || minimumVersion == null) {
+            return false;
+        }
+
+        for (int i = 0; i < 3; i++) {
+            if (candidateVersion[i] != minimumVersion[i]) {
+                return candidateVersion[i] > minimumVersion[i];
+            }
+        }
+        return true;
+    }
+
+    private int[] extractSemver(String rawVersion) {
+        if (rawVersion == null || rawVersion.isBlank()) {
+            return null;
+        }
+
+        Matcher matcher = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)").matcher(rawVersion);
+        if (!matcher.find()) {
+            return null;
+        }
+
+        return new int[]{
+                Integer.parseInt(matcher.group(1)),
+                Integer.parseInt(matcher.group(2)),
+                Integer.parseInt(matcher.group(3))
+        };
     }
 
     private String extractDisplayName(JsonNode userNode) {
