@@ -1,33 +1,51 @@
-import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
-import { Event } from '../model/Resource';
+import { Inject, Injectable } from '@angular/core';
+import { Observable, map } from 'rxjs';
+import { API_BASE_URL } from '../app/core/api.tokens';
+import { CalendarEvent, CalendarEventDto, SaveCalendarEventPayload } from '../model/calendar-event.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class EventService {
+  private readonly url: string;
 
-  private http = inject(HttpClient);
-  private events = signal<Event[]>([])
-  readonly url = 'http://localhost:8088/api/events';
-
-  constructor() { 
-    console.log("constructor EventService appelé");
+  constructor(
+    private readonly http: HttpClient,
+    @Inject(API_BASE_URL) apiBaseUrl: string
+  ) {
+    this.url = `${apiBaseUrl}/events`;
   }
 
-  saveEvent(event: any): Observable<Event> {
-    console.log("post EventService by resource appelé ");
-    console.log("event.dateDebutEvent :  "+event.dateDebutEvent);
-    return this.http.post<Event>(this.url+'/create', event).pipe(
-      tap(savedEvent => {
-        console.log("post saved ok appelé "+savedEvent.dateDebutEvent);
-      })
-    );
+  saveEvent(payload: SaveCalendarEventPayload): Observable<CalendarEvent> {
+    return this.http
+      .post<CalendarEventDto>(`${this.url}/create`, payload)
+      .pipe(map((eventDto) => this.mapCalendarEventDto(eventDto)));
   }
 
   deleteEvent(id: number): Observable<void> {
-    console.log('delete EventService appelé id=' + id);
     return this.http.delete<void>(`${this.url}/${id}`);
+  }
+
+  private mapCalendarEventDto(dto: CalendarEventDto): CalendarEvent {
+    const eventId = dto.idEvent ?? dto.id;
+    if (!eventId || !dto.dateDebutEvent || !dto.dateFinEvent) {
+      throw new Error('Invalid CalendarEventDto received from backend');
+    }
+
+    return {
+      id: eventId,
+      dateDebutEvent: this.normalizeDate(dto.dateDebutEvent),
+      dateFinEvent: this.normalizeDate(dto.dateFinEvent),
+      isJournee: !!dto.isJournee,
+      isMatin: !!dto.isMatin,
+      isApresMidi: !!dto.isApresMidi
+    };
+  }
+
+  private normalizeDate(value: string | Date): Date {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date;
   }
 }

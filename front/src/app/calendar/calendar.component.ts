@@ -28,6 +28,7 @@ import { Subscription } from 'rxjs';
 /* === Domain models & utils === */
 import { CalendarVO } from '../../model/CalendarVO';
 import { Month, Resource, Holiday, Event } from '../../model/Resource';
+import { SaveCalendarEventPayload } from '../../model/calendar-event.model';
 
 import { CalendarService } from '../../service/calendar.service';
 import { CalendarCacheService } from '../../service/calendar-cache.service';
@@ -232,7 +233,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
       ref.afterClosed().subscribe((confirm) => {
         if (!confirm) return;
 
-        const id = (ev as any).idEvent ?? (ev as any).id ?? null;
+        const id = ev.idEvent;
         if (!id) {
           console.error('Impossible de supprimer: id manquant sur Event');
           return;
@@ -241,7 +242,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
         this.calendarFacade.deleteEvent(id).subscribe({
           next: () => {
             // 1) Retire localement l’event
-            res.events = res.events.filter(e => (e as any).id !== id && (e as any).idEvent !== id);
+            res.events = res.events.filter((e) => e.idEvent !== id);
 
             // 2) Clés de mois impactés
             const toMidnight = (d: Date | string) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
@@ -296,12 +297,16 @@ export class CalendarComponent implements OnInit, OnDestroy {
         const dd = String(x.getDate()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
       }
-      this.calendarFacade.saveEvent({
-        ...ev,
+      const payload: SaveCalendarEventPayload = {
         dateDebutEvent: toYMDLocal(ev.dateDebutEvent!),
-        dateFinEvent:   toYMDLocal(ev.dateFinEvent!),
+        dateFinEvent: toYMDLocal(ev.dateFinEvent!),
+        isJournee: !!ev.isJournee,
+        isMatin: !!ev.isMatin,
+        isApresMidi: !!ev.isApresMidi,
         developper: { idResource: res.idResource }
-      }).subscribe({
+      };
+
+      this.calendarFacade.saveEvent(payload).subscribe({
         next: (saved) => {
           /* 1️⃣  normalise → Date locales minuit */
           const toMidnight = (iso: string | Date) => {

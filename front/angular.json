@@ -37,11 +37,11 @@
                 "output": "assets"
               }
             ],
-           "stylePreprocessorOptions": {              
-            "includePaths": [
-               "src",
-               "node_modules"
-             ]
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "src",
+                "node_modules"
+              ]
             },
             "styles": [
               "node_modules/bootstrap/dist/css/bootstrap.min.css",
@@ -63,7 +63,13 @@
                   "maximumError": "4kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.prod.ts"
+                }
+              ]
             },
             "development": {
               "optimization": false,
@@ -103,11 +109,11 @@
                 "input": "public"
               }
             ],
-           "stylePreprocessorOptions": {              
-            "includePaths": [
-               "src",
-               "node_modules"
-             ]
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "src",
+                "node_modules"
+              ]
             },
             "styles": [
               "node_modules/bootstrap/dist/css/bootstrap.min.css",
