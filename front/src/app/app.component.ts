@@ -41,14 +41,23 @@ export class AppComponent {
 
   darkMode = false;
 
+  private readonly themeStorageKey = 'sages2-theme';
+
   constructor(private overlayContainer: OverlayContainer) {}
 
   ngOnInit() {
+    const savedTheme = localStorage.getItem(this.themeStorageKey);
+    if (savedTheme) {
+      this.darkMode = savedTheme === 'dark';
+    } else {
+      this.darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
     this.setDarkMode(this.darkMode);
   }
 
   toggleDarkMode() {
     this.darkMode = !this.darkMode;
+    localStorage.setItem(this.themeStorageKey, this.darkMode ? 'dark' : 'light');
     this.setDarkMode(this.darkMode);
   }
 

@@ -1,6 +1,34 @@
 .example-container {
-  height: 100vh;
+  min-height: 100vh;
+  background: transparent;
 }
 
+mat-sidenav {
+  width: 290px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+}
 
+mat-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin: 0.75rem 0.75rem 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, var(--surface-strong)), var(--surface-strong));
+  color: var(--text);
+}
 
+mat-nav-list a.mat-mdc-list-item {
+  margin: 0.25rem 0.45rem;
+  border-radius: 12px;
+  color: var(--text-muted);
+}
+
+mat-nav-list a.mat-mdc-list-item:hover,
+mat-nav-list a.mat-mdc-list-item.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+}

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit} from '@angular/core';
+import { Component, Input, OnDestroy, OnInit} from '@angular/core';
 import {  SprintInfo, Ticket } from '../../model/SprintInfo.model';
 import { JiraService } from '../../service/jira.service';
 import { TicketTableComponent } from "../ticket-table/ticket-table.component";
@@ -24,7 +24,7 @@ type TypeCountMap = Record<string, { nbTickets: number; nbStoryPoints: number }>
   templateUrl: './sprint-scope.component.html',
   styleUrl: './sprint-scope.component.css'
 })
-export class SprintScopeComponent implements OnInit {
+export class SprintScopeComponent implements OnInit, OnDestroy {
   @Input() sprintId!: string;
   sprintInfo?: SprintInfo;
 
@@ -36,6 +36,7 @@ export class SprintScopeComponent implements OnInit {
   showCommittedByType = true;
   showAddedByType = true;
   showTotalByType = true;
+  private themeObserver?: MutationObserver;
 
   // === Marges et dimensions slide (LAYOUT_16x9: 10" x 5.625") ===
   private readonly PPT = {
@@ -53,6 +54,14 @@ export class SprintScopeComponent implements OnInit {
   constructor(private jiraService: JiraService) {}
 
   ngOnInit(): void {
+    this.themeObserver = new MutationObserver(() => {
+      if (this.sprintInfo) {
+        this.updateKpiChart();
+        this.updateTicketTypeChart();
+      }
+    });
+    this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
     this.jiraService.getSprintFullInfo(this.sprintId).subscribe(data => {
       console.log(data);
       this.sprintInfo = data;
@@ -61,6 +70,10 @@ export class SprintScopeComponent implements OnInit {
     });
   }
 
+
+  ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
+  }
   onChartInit(id: 'kpi' | 'typeSp' | 'typeNb', ec: echarts.ECharts): void {
     this.charts[id] = ec;
     setTimeout(() => ec.resize(), 0);
@@ -77,19 +90,23 @@ export class SprintScopeComponent implements OnInit {
   updateKpiChart(): void {
     if (!this.sprintInfo?.sprintKpiInfo) return;
 
+    const styles = getComputedStyle(document.body);
+    const chartText = styles.getPropertyValue('--chart-label').trim() || '#4a5c82';
+
     this.kpiChartOptions = {
-      title: { text: 'Indicateurs principaux', left: 'center' },
+      textStyle: { color: chartText },
+      title: { text: 'Indicateurs principaux', left: 'center', textStyle: { color: chartText } },
       tooltip: {
         trigger: 'item',
         formatter: (params: any) => `${params.name}: ${params.value.toFixed(1)}%`
       },
-      legend: { bottom: '0', left: 'center' },
+      legend: { bottom: '0', left: 'center', textStyle: { color: chartText } },
       series: [
         {
           name: 'KPIs',
           type: 'pie',
           radius: '50%',
-          color: ['#4caf50', '#ff9800', '#f44336'],
+          color: ['#20c07d', '#f6b032', '#f26b88'],
           data: [
             { value: this.sprintInfo?.sprintKpiInfo.engagementRespectePourcent, name: 'Engagement respecté' },
             { value: this.sprintInfo?.sprintKpiInfo.ajoutsNonPrevusPourcent, name: 'Ajouts en cours' },
@@ -125,6 +142,10 @@ export class SprintScopeComponent implements OnInit {
     const typeCount = this.sprintInfo?.sprintKpiInfo?.typeCountAll;
     if (!typeCount) { return; }
 
+    const styles = getComputedStyle(document.body);
+    const chartText = styles.getPropertyValue('--chart-label').trim() || '#4a5c82';
+    const chartGrid = styles.getPropertyValue('--chart-grid').trim() || '#d9e1f4';
+
     /* ---------- Données ---------- */
     const dataSP: PieSeriesOption['data'] = Object.entries(typeCount).map(([type, c]) => ({
       name: type,
@@ -145,7 +166,7 @@ export class SprintScopeComponent implements OnInit {
       avoidLabelOverlap: true,
       itemStyle: {
         borderRadius: 6,
-        borderColor: '#fff',
+        borderColor: chartGrid,
         borderWidth: 2
       },
       label: { formatter: '{b}\n{d}%', fontSize: 12 }
@@ -153,17 +174,19 @@ export class SprintScopeComponent implements OnInit {
 
     /* ---------- Story-points par type ---------- */
     this.ticketTypeChartOptions = <EChartsOption>{
-      title: { text: 'Répartition Story-Points par type de ticket', left: 'center' },
+      textStyle: { color: chartText },
+      title: { text: 'Répartition Story-Points par type de ticket', left: 'center', textStyle: { color: chartText } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: 0, left: 'center' },
+      legend: { bottom: 0, left: 'center', textStyle: { color: chartText } },
       series: [{ ...basePie, name: 'Types', data: dataSP }]
     };
 
     /* ---------- Nombre de tickets par type ---------- */
     this.ticketNbTypeChartOptions = <EChartsOption>{
-      title: { text: 'Répartition Nombre de tickets par type', left: 'center' },
+      textStyle: { color: chartText },
+      title: { text: 'Répartition Nombre de tickets par type', left: 'center', textStyle: { color: chartText } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: 0, left: 'center' },
+      legend: { bottom: 0, left: 'center', textStyle: { color: chartText } },
       series: [{ ...basePie, name: 'Types', data: dataNB }]
     };
   }

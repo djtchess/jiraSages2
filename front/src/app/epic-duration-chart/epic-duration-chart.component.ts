@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
@@ -22,7 +22,7 @@ import { EpicChildTicket, EpicDeliveryOverview } from '../../model/epic-duration
   templateUrl: './epic-duration-chart.component.html',
   styleUrl: './epic-duration-chart.component.css'
 })
-export class EpicDurationChartComponent implements OnInit, OnChanges {
+export class EpicDurationChartComponent implements OnInit, OnChanges, OnDestroy {
   @Input() projectKey = 'SAG';
 
   isLoading = false;
@@ -37,11 +37,23 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
   chartOptions: EChartsOption = {};
   selectedEpic: EpicDeliveryOverview | null = null;
   ticketWorklogChartOptions: EChartsOption = {};
+  private themeObserver?: MutationObserver;
 
   constructor(private jiraService: JiraService) {}
 
   ngOnInit(): void {
+    this.themeObserver = new MutationObserver(() => {
+      this.buildChart(this.filteredData);
+      if (this.selectedEpic) {
+        this.buildTicketWorklogChart(this.selectedEpic.childTickets || []);
+      }
+    });
+    this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     this.loadData();
+  }
+
+  ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -626,10 +638,15 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     return (row.developers || []).join(', ');
   }
   private buildTicketWorklogChart(tickets: EpicChildTicket[]): void {
+    const styles = getComputedStyle(document.body);
+    const chartText = styles.getPropertyValue('--chart-label').trim() || '#4a5c82';
+    const chartGrid = styles.getPropertyValue('--chart-grid').trim() || '#d9e1f4';
+
     this.ticketWorklogChartOptions = {
+      textStyle: { color: chartText },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      xAxis: { type: 'category', data: tickets.map(t => t.ticketKey), axisLabel: { rotate: 35 } },
-      yAxis: { type: 'value', name: 'Jours passés' },
+      xAxis: { type: 'category', data: tickets.map(t => t.ticketKey), axisLabel: { rotate: 35, color: chartText }, axisLine: { lineStyle: { color: chartGrid } } },
+      yAxis: { type: 'value', name: 'Jours passés', nameTextStyle: { color: chartText }, axisLabel: { color: chartText }, splitLine: { lineStyle: { color: chartGrid } } },
       series: [
         {
           name: 'Temps passé',
@@ -642,6 +659,10 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
   }
 
   private buildChart(rows: EpicDeliveryOverview[]): void {
+    const styles = getComputedStyle(document.body);
+    const chartText = styles.getPropertyValue('--chart-label').trim() || '#4a5c82';
+    const chartGrid = styles.getPropertyValue('--chart-grid').trim() || '#d9e1f4';
+
     const epics = rows.map(r => r.epicKey);
     const storyPoints = rows.map(r => Number(r.totalStoryPoints || 0));
     const timeSpentDays = rows.map(r => Number(r.totalTimeSpentDays || 0));
@@ -660,10 +681,11 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
           return `<b>${epic?.epicKey ?? ''}</b><br/>${lines}<br/>Versions tickets enfants: <b>${versions}</b><br/>Sprints: <b>${sprints}</b><br/>Développeurs: <b>${devs}</b>`;
         }
       },
-      legend: { data: ['Story Points', 'Temps (jours)'] },
+      textStyle: { color: chartText },
+      legend: { data: ['Story Points', 'Temps (jours)'], textStyle: { color: chartText } },
       grid: { left: '3%', right: '4%', bottom: '8%', containLabel: true },
-      xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35 } },
-      yAxis: { type: 'value', name: 'Valeur' },
+      xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35, color: chartText }, axisLine: { lineStyle: { color: chartGrid } } },
+      yAxis: { type: 'value', name: 'Valeur', nameTextStyle: { color: chartText }, axisLabel: { color: chartText }, splitLine: { lineStyle: { color: chartGrid } } },
       series: [
         { name: 'Story Points', type: 'bar', data: storyPoints, itemStyle: { color: '#1976d2' } },
         { name: 'Temps (jours)', type: 'bar', data: timeSpentDays, itemStyle: { color: '#ef6c00' } }
