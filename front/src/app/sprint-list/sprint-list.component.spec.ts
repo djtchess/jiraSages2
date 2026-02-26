@@ -1,6 +1,7 @@
+import { of } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { SprintListComponent } from './sprint-list.component';
+import { JiraService } from '../../service/jira.service';
 
 describe('SprintListComponent', () => {
   let component: SprintListComponent;
@@ -8,9 +9,16 @@ describe('SprintListComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SprintListComponent]
-    })
-    .compileComponents();
+      imports: [SprintListComponent],
+      providers: [
+        {
+          provide: JiraService,
+          useValue: {
+            getSprintsForProject: () => of([])
+          }
+        }
+      ]
+    }).compileComponents();
 
     fixture = TestBed.createComponent(SprintListComponent);
     component = fixture.componentInstance;
