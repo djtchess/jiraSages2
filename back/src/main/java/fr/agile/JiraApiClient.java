@@ -23,16 +23,25 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import fr.agile.dto.AvancementHistorique;
 import fr.agile.dto.BoardInfo;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.BurnupPointDTO;
+import fr.agile.dto.EpicChildTicketDTO;
+import fr.agile.dto.EpicDeliveryOverviewDTO;
+import fr.agile.dto.EpicDurationEntryDTO;
+import fr.agile.dto.EpicSprintDTO;
 import fr.agile.dto.SprintInfoDTO;
 import fr.agile.entities.Developper;
 import fr.agile.entities.Event;
@@ -50,9 +59,12 @@ import fr.agile.service.SprintService;
 import fr.agile.sprint.SprintCapacityCalculator;
 import fr.agile.utils.BurnupUtils;
 import fr.agile.utils.JqlBuilder;
+import fr.agile.dto.SprintVersionEpicDurationDTO;
 
 @Component
 public class JiraApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(JiraApiClient.class);
 
     @Value("${jira.baseUrl}")
     private String JIRA_URL;
@@ -62,6 +74,7 @@ public class JiraApiClient {
     private static final ZoneId Z_PARIS = ZoneId.of("Europe/Paris");
     private static final DateTimeFormatter JIRA_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX");
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
     private DevelopperService developpeurService;
@@ -489,6 +502,281 @@ public class JiraApiClient {
         }
 
         return sprintList;
+    }
+
+
+    public List<EpicDeliveryOverviewDTO> getEpicDeliveries(String projectKey) throws Exception {
+        List<BoardInfo> boards = getBoardsForProject(projectKey);
+
+        Map<Long, SprintInfoDTO> sprintById = new HashMap<>();
+
+        for (BoardInfo board : boards) {
+            try {
+                List<SprintInfoDTO> boardSprints = getAllSprintsForBoard(board.getId());
+                for (SprintInfoDTO sprint : boardSprints) {
+                    sprintById.put(sprint.getId(), sprint);
+                }
+            } catch (Exception ex) {
+                log.warn("Board {} ({}) ignoré pour l'agrégation des épics : {}", board.getId(), board.getName(), ex.getMessage());
+            }
+        }
+
+        List<JsonNode> epicIssues = searchIssuesByJql(
+                String.format("project = %s AND issuetype = Epic", projectKey),
+                List.of("key", "summary", "status", "fixVersions")
+        );
+
+        List<EpicDeliveryOverviewDTO> result = new ArrayList<>();
+        for (JsonNode issue : epicIssues) {
+            String epicKey = issue.path("key").asText();
+            JsonNode fields = issue.path("fields");
+
+            String epicSummary = fields.path("summary").asText("Sans résumé");
+            String status = fields.path("status").path("name").asText("Inconnu");
+
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "customfield_10020", "fixVersions"));
+
+            Set<String> versionSet = new TreeSet<>();
+            Set<String> developersSet = new TreeSet<>();
+            List<EpicChildTicketDTO> childTickets = new ArrayList<>();
+
+            for (JsonNode childIssue : childIssues) {
+                JsonNode fieldsChild = childIssue.path("fields");
+                String childKey = childIssue.path("key").asText();
+                String childSummary = fieldsChild.path("summary").asText("Sans résumé");
+
+                JsonNode fixVersions = fieldsChild.path("fixVersions");
+                if (fixVersions.isArray()) {
+                    for (JsonNode versionNode : fixVersions) {
+                        String name = versionNode.path("name").asText(null);
+                        if (name != null && !name.isBlank()) {
+                            versionSet.add(name);
+                        }
+                    }
+                }
+
+                WorklogSummary ws = getWorklogSummary(childKey);
+                developersSet.addAll(ws.developers());
+                childTickets.add(new EpicChildTicketDTO(
+                        childKey,
+                        JIRA_URL + "/browse/" + childKey,
+                        childSummary,
+                        BurnupUtils.roundToTwoDecimals(ws.totalSeconds() / 3600.0),
+                        ws.developers()
+                ));
+            }
+            List<String> versions = versionSet.isEmpty() ? List.of("Sans version") : new ArrayList<>(versionSet);
+
+            Set<Long> sprintIds = extractSprintIdsFromIssues(childIssues);
+            List<EpicSprintDTO> deliveries = sprintIds.stream()
+                    .map(id -> {
+                        SprintInfoDTO sprint = sprintById.get(id);
+                        if (sprint == null) {
+                            return null;
+                        }
+                        return new EpicSprintDTO(id, sprint.getName());
+                    })
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(EpicSprintDTO::sprintId))
+                    .toList();
+
+            if (!deliveries.isEmpty()) {
+                result.add(new EpicDeliveryOverviewDTO(epicKey, epicSummary, status, versions, deliveries, new ArrayList<>(developersSet), childTickets));
+            }
+        }
+
+        result.sort(Comparator.comparing(EpicDeliveryOverviewDTO::epicKey));
+        return result;
+    }
+
+    public List<SprintVersionEpicDurationDTO> getEpicDurationsByVersionForBoard(long boardId, String projectKey) throws Exception {
+        List<SprintInfoDTO> sprints = getAllSprintsForBoard(boardId).stream()
+                .filter(s -> s.getStartDate() != null && s.getEndDate() != null)
+                .sorted(Comparator.comparing(SprintInfoDTO::getStartDate))
+                .toList();
+
+        List<JsonNode> epicIssues = searchIssuesByJql(
+                String.format("project = %s AND issuetype = Epic", projectKey),
+                List.of("key", "summary", "status", "created", "resolutiondate", "fixVersions")
+        );
+
+        Map<String, Set<Long>> sprintIdsByEpic = new HashMap<>();
+        for (JsonNode issue : epicIssues) {
+            String epicKey = issue.path("key").asText();
+            sprintIdsByEpic.put(epicKey, getSprintIdsForEpicFromChildren(projectKey, epicKey));
+        }
+
+        List<SprintVersionEpicDurationDTO> result = new ArrayList<>();
+        for (SprintInfoDTO sprint : sprints) {
+            Map<String, List<EpicDurationEntryDTO>> epicsByVersion = new HashMap<>();
+
+            for (JsonNode issue : epicIssues) {
+                String epicKey = issue.path("key").asText();
+                JsonNode fields = issue.path("fields");
+
+                Set<Long> sprintIds = sprintIdsByEpic.getOrDefault(epicKey, Set.of());
+                if (!sprintIds.contains(sprint.getId())) {
+                    continue;
+                }
+
+                String epicSummary = fields.path("summary").asText("Sans résumé");
+                String status = fields.path("status").path("name").asText("Inconnu");
+                ZonedDateTime createdDate = jiraParser.parseJiraDate(fields.path("created").asText(null), Z_PARIS);
+                ZonedDateTime resolutionDate = jiraParser.parseJiraDate(fields.path("resolutiondate").asText(null), Z_PARIS);
+                double durationDays = computeDurationWithinSprint(createdDate, resolutionDate, sprint.getStartDate(), sprint.getEndDate());
+
+                JsonNode fixVersions = fields.path("fixVersions");
+                if (fixVersions.isArray() && fixVersions.size() > 0) {
+                    for (JsonNode versionNode : fixVersions) {
+                        String versionName = versionNode.path("name").asText("Sans version");
+                        epicsByVersion
+                                .computeIfAbsent(versionName, ignored -> new ArrayList<>())
+                                .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays, sprintIds.stream().sorted().toList()));
+                    }
+                } else {
+                    epicsByVersion
+                            .computeIfAbsent("Sans version", ignored -> new ArrayList<>())
+                            .add(new EpicDurationEntryDTO(epicKey, epicSummary, status, durationDays, sprintIds.stream().sorted().toList()));
+                }
+            }
+
+            for (Map.Entry<String, List<EpicDurationEntryDTO>> entry : epicsByVersion.entrySet()) {
+                List<EpicDurationEntryDTO> epics = entry.getValue();
+                double total = BurnupUtils.roundToTwoDecimals(epics.stream().mapToDouble(EpicDurationEntryDTO::durationDays).sum());
+                int count = epics.size();
+                double average = count == 0 ? 0.0 : BurnupUtils.roundToTwoDecimals(total / count);
+
+                result.add(new SprintVersionEpicDurationDTO(
+                        sprint.getId(),
+                        sprint.getName(),
+                        entry.getKey(),
+                        count,
+                        total,
+                        average,
+                        epics
+                ));
+            }
+        }
+
+        result.sort(Comparator
+                .comparing(SprintVersionEpicDurationDTO::sprintId)
+                .thenComparing(SprintVersionEpicDurationDTO::versionName));
+        return result;
+    }
+
+    private Set<Long> getSprintIdsForEpicFromChildren(String projectKey, String epicKey) throws Exception {
+        List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("customfield_10020"));
+        return extractSprintIdsFromIssues(childIssues);
+    }
+
+    private List<JsonNode> getChildIssuesForEpic(String projectKey, String epicKey, List<String> fields) throws Exception {
+        String epicLinkJql = String.format("project = %s AND \"Epic Link\" = \"%s\"", projectKey, epicKey);
+        try {
+            return searchIssuesByJql(epicLinkJql, fields);
+        } catch (Exception ex) {
+            String parentJql = String.format("project = %s AND parent = \"%s\"", projectKey, epicKey);
+            return searchIssuesByJql(parentJql, fields);
+        }
+    }
+
+    private Set<Long> extractSprintIdsFromIssues(List<JsonNode> childIssues) {
+        Set<Long> sprintIds = new TreeSet<>();
+        for (JsonNode childIssue : childIssues) {
+            JsonNode sprintField = childIssue.path("fields").path("customfield_10020");
+            if (!sprintField.isArray()) {
+                continue;
+            }
+            for (JsonNode sprintNode : sprintField) {
+                if (sprintNode.has("id")) {
+                    sprintIds.add(sprintNode.path("id").asLong());
+                }
+            }
+        }
+        return sprintIds;
+    }
+
+    private WorklogSummary getWorklogSummary(String issueKey) throws Exception {
+        int startAt = 0;
+        int maxResults = 100;
+        int total = Integer.MAX_VALUE;
+        long totalSeconds = 0L;
+        Set<String> developers = new TreeSet<>();
+
+        while (startAt < total) {
+            String url = JIRA_URL + "/rest/api/3/issue/" + issueKey + "/worklog?startAt=" + startAt + "&maxResults=" + maxResults;
+            HttpRequest request = jiraHttpClient.createRequest(url);
+            String body = jiraHttpClient.sendRequest(request);
+            JsonNode root = MAPPER.readTree(body);
+
+            total = root.path("total").asInt(0);
+            for (JsonNode worklog : root.path("worklogs")) {
+                totalSeconds += worklog.path("timeSpentSeconds").asLong(0L);
+                String dev = worklog.path("author").path("displayName").asText(null);
+                if (dev != null && !dev.isBlank()) {
+                    developers.add(dev);
+                }
+            }
+            startAt += maxResults;
+        }
+
+        return new WorklogSummary(totalSeconds, new ArrayList<>(developers));
+    }
+
+    private record WorklogSummary(long totalSeconds, List<String> developers) {}
+
+    private List<JsonNode> searchIssuesByJql(String jql, List<String> fields) throws Exception {
+        final String urlString = JIRA_URL + SEARCH_JQL_API;
+        final int maxResults = 50;
+        String nextPageToken = null;
+        boolean isLast = false;
+        List<JsonNode> issues = new ArrayList<>();
+
+        while (!isLast) {
+            ObjectNode body = MAPPER.createObjectNode();
+            body.put("jql", jql);
+            body.put("maxResults", maxResults);
+            if (nextPageToken != null) {
+                body.put("nextPageToken", nextPageToken);
+            }
+
+            ArrayNode fieldsNode = body.putArray("fields");
+            for (String field : fields) {
+                fieldsNode.add(field);
+            }
+
+            HttpRequest request = jiraHttpClient.createPostJsonRequest(urlString, body.toString());
+            String response = jiraHttpClient.sendRequest(request);
+            JsonNode root = MAPPER.readTree(response);
+
+            for (JsonNode issue : root.path("issues")) {
+                issues.add(issue);
+            }
+
+            isLast = root.path("isLast").asBoolean(false);
+            nextPageToken = root.path("nextPageToken").isMissingNode() ? null : root.path("nextPageToken").asText(null);
+        }
+
+        return issues;
+    }
+
+    private double computeDurationWithinSprint(ZonedDateTime createdDate,
+                                               ZonedDateTime resolutionDate,
+                                               ZonedDateTime sprintStart,
+                                               ZonedDateTime sprintEnd) {
+        if (createdDate == null || sprintStart == null || sprintEnd == null) {
+            return 0.0;
+        }
+
+        ZonedDateTime effectiveStart = createdDate.isAfter(sprintStart) ? createdDate : sprintStart;
+        ZonedDateTime rawEnd = resolutionDate != null ? resolutionDate : sprintEnd;
+        ZonedDateTime effectiveEnd = rawEnd.isBefore(sprintEnd) ? rawEnd : sprintEnd;
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            return 0.0;
+        }
+
+        long hours = java.time.Duration.between(effectiveStart, effectiveEnd).toHours();
+        return BurnupUtils.roundToTwoDecimals(hours / 24.0);
     }
 
 
