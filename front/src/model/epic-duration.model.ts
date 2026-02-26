@@ -7,7 +7,8 @@ export interface EpicChildTicket {
   ticketKey: string;
   ticketUrl: string;
   summary: string;
-  timeSpentHours: number;
+  storyPoints: number;
+  timeSpentDays: number;
   developers: string[];
 }
 
@@ -18,5 +19,8 @@ export interface EpicDeliveryOverview {
   versionNames: string[];
   sprintDeliveries: EpicSprintDelivery[];
   developers: string[];
+  totalStoryPoints: number;
+  totalTimeSpentDays: number;
+  epicVelocity: number;
   childTickets: EpicChildTicket[];
 }

@@ -6,7 +6,8 @@ public record EpicChildTicketDTO(
         String ticketKey,
         String ticketUrl,
         String summary,
-        double timeSpentHours,
+        double storyPoints,
+        double timeSpentDays,
         List<String> developers
 ) {
 }

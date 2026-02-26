@@ -59,6 +59,21 @@
       <td mat-cell *matCellDef="let row">{{ formatSprints(row) }}</td>
     </ng-container>
 
+    <ng-container matColumnDef="storyPoints">
+      <th mat-header-cell *matHeaderCellDef>Story Points</th>
+      <td mat-cell *matCellDef="let row">{{ row.totalStoryPoints | number:'1.2-2' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="days">
+      <th mat-header-cell *matHeaderCellDef>Temps (jours)</th>
+      <td mat-cell *matCellDef="let row">{{ row.totalTimeSpentDays | number:'1.2-2' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="velocity">
+      <th mat-header-cell *matHeaderCellDef>Vélocité epic (SP/j)</th>
+      <td mat-cell *matCellDef="let row">{{ formatVelocity(row) }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="developers">
       <th mat-header-cell *matHeaderCellDef>Développeurs epic</th>
       <td mat-cell *matCellDef="let row">{{ formatDevelopers(row) }}</td>
@@ -86,17 +101,21 @@
         <th mat-header-cell *matHeaderCellDef>Résumé</th>
         <td mat-cell *matCellDef="let t">{{ t.summary }}</td>
       </ng-container>
-      <ng-container matColumnDef="timeSpentHours">
-        <th mat-header-cell *matHeaderCellDef>Temps passé (h)</th>
-        <td mat-cell *matCellDef="let t">{{ t.timeSpentHours | number:'1.2-2' }}</td>
+      <ng-container matColumnDef="storyPoints">
+        <th mat-header-cell *matHeaderCellDef>Story Points</th>
+        <td mat-cell *matCellDef="let t">{{ t.storyPoints | number:'1.2-2' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="timeSpentDays">
+        <th mat-header-cell *matHeaderCellDef>Temps passé (j)</th>
+        <td mat-cell *matCellDef="let t">{{ t.timeSpentDays | number:'1.2-2' }}</td>
       </ng-container>
       <ng-container matColumnDef="developers">
         <th mat-header-cell *matHeaderCellDef>Développeurs</th>
         <td mat-cell *matCellDef="let t">{{ t.developers.join(', ') }}</td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','timeSpentHours','developers']"></tr>
-      <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','timeSpentHours','developers']"></tr>
+      <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','storyPoints','timeSpentDays','developers']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','storyPoints','timeSpentDays','developers']"></tr>
     </table>
   </div>
 </div>

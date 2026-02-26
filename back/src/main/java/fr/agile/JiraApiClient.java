@@ -534,11 +534,13 @@ public class JiraApiClient {
             String epicSummary = fields.path("summary").asText("Sans résumé");
             String status = fields.path("status").path("name").asText("Inconnu");
 
-            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "customfield_10020", "fixVersions"));
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "customfield_10020", "fixVersions", "customfield_10028"));
 
             Set<String> versionSet = new TreeSet<>();
             Set<String> developersSet = new TreeSet<>();
             List<EpicChildTicketDTO> childTickets = new ArrayList<>();
+            double totalStoryPoints = 0.0;
+            double totalTimeSpentDays = 0.0;
 
             for (JsonNode childIssue : childIssues) {
                 JsonNode fieldsChild = childIssue.path("fields");
@@ -555,13 +557,21 @@ public class JiraApiClient {
                     }
                 }
 
+                Double storyPointsRaw = BurnupUtils.parseDouble(fieldsChild.path("customfield_10028").asText(null));
+                double storyPoints = storyPointsRaw != null ? storyPointsRaw : 0.0;
+
                 WorklogSummary ws = getWorklogSummary(childKey);
                 developersSet.addAll(ws.developers());
+                double timeSpentDays = BurnupUtils.roundToTwoDecimals(ws.totalSeconds() / 28800.0);
+                totalStoryPoints += storyPoints;
+                totalTimeSpentDays += timeSpentDays;
+
                 childTickets.add(new EpicChildTicketDTO(
                         childKey,
                         JIRA_URL + "/browse/" + childKey,
                         childSummary,
-                        BurnupUtils.roundToTwoDecimals(ws.totalSeconds() / 3600.0),
+                        BurnupUtils.roundToTwoDecimals(storyPoints),
+                        timeSpentDays,
                         ws.developers()
                 ));
             }
@@ -581,7 +591,24 @@ public class JiraApiClient {
                     .toList();
 
             if (!deliveries.isEmpty()) {
-                result.add(new EpicDeliveryOverviewDTO(epicKey, epicSummary, status, versions, deliveries, new ArrayList<>(developersSet), childTickets));
+                totalStoryPoints = BurnupUtils.roundToTwoDecimals(totalStoryPoints);
+                totalTimeSpentDays = BurnupUtils.roundToTwoDecimals(totalTimeSpentDays);
+                double epicVelocity = totalTimeSpentDays > 0.0
+                        ? BurnupUtils.roundToTwoDecimals(totalStoryPoints / totalTimeSpentDays)
+                        : 0.0;
+
+                result.add(new EpicDeliveryOverviewDTO(
+                        epicKey,
+                        epicSummary,
+                        status,
+                        versions,
+                        deliveries,
+                        new ArrayList<>(developersSet),
+                        totalStoryPoints,
+                        totalTimeSpentDays,
+                        epicVelocity,
+                        childTickets
+                ));
             }
         }
 
