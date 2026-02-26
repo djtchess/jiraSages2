@@ -1,275 +1,155 @@
 @use '@angular/material' as mat;
 
-// 1. Palettes (M2-namespaced)
-$dark-primary: mat.m2-define-palette(mat.$m2-indigo-palette, 700);
-$dark-accent:  mat.m2-define-palette(mat.$m2-pink-palette, 600, A200, A100);
-$dark-warn:    mat.m2-define-palette(mat.$m2-red-palette);
+$dark-primary: mat.m2-define-palette(mat.$m2-indigo-palette, 500);
+$dark-accent: mat.m2-define-palette(mat.$m2-cyan-palette, A200, A100, A400);
+$dark-warn: mat.m2-define-palette(mat.$m2-red-palette);
 
 $light-primary: mat.m2-define-palette(mat.$m2-indigo-palette);
-$light-accent:  mat.m2-define-palette(mat.$m2-pink-palette, A200, A100, A400);
-$light-warn:    mat.m2-define-palette(mat.$m2-red-palette);
+$light-accent: mat.m2-define-palette(mat.$m2-cyan-palette, A200, A100, A400);
+$light-warn: mat.m2-define-palette(mat.$m2-red-palette);
 
-// 2. Thèmes (M2-namespaced)
 $dark-theme: mat.m2-define-dark-theme((
   color: (
     primary: $dark-primary,
-    accent:  $dark-accent,
-    warn:    $dark-warn,
+    accent: $dark-accent,
+    warn: $dark-warn,
   )
 ));
 
 $light-theme: mat.m2-define-light-theme((
   color: (
     primary: $light-primary,
-    accent:  $light-accent,
-    warn:    $light-warn,
+    accent: $light-accent,
+    warn: $light-warn,
   )
 ));
 
-// 3. Inclusion core + thème clair par défaut
 @include mat.core();
 @include mat.all-component-themes($light-theme);
 
+:root,
+[data-theme='light'] {
+  --color-bg: #f3f6fb;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f8faff;
+  --color-text: #0f172a;
+  --color-text-muted: #54627a;
+  --color-border: #dbe4f2;
+  --color-primary: #3558e6;
+  --color-primary-strong: #2441b8;
+  --color-accent: #00a9d4;
+  --color-danger: #d9465f;
 
-/* === Styles globaux et autres composants en mode sombre === */
+  --chart-axis: #5c6f90;
+  --chart-grid: rgba(76, 103, 153, 0.2);
+  --chart-story: #3563ff;
+  --chart-time: #ff8a3d;
+  --chart-capacity: #16a34a;
 
-html, body {
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-soft: 0 12px 26px rgba(34, 52, 84, 0.08);
+  --shadow: var(--shadow-soft);
+  --ring: rgba(53, 88, 230, 0.32);
+}
+
+[data-theme='dark'] {
+  --color-bg: #090f1d;
+  --color-surface: #101a2f;
+  --color-surface-soft: #14213d;
+  --color-text: #e8efff;
+  --color-text-muted: #9cb0d8;
+  --color-border: #2a3d67;
+  --color-primary: #7da8ff;
+  --color-primary-strong: #abc4ff;
+  --color-accent: #57e3ff;
+  --color-danger: #ff7f96;
+
+  --chart-axis: #b6c8eb;
+  --chart-grid: rgba(128, 158, 222, 0.26);
+  --chart-story: #81a8ff;
+  --chart-time: #ffc068;
+  --chart-capacity: #4ade80;
+
+  --shadow-soft: 0 12px 26px rgba(0, 0, 0, 0.35);
+  --shadow: var(--shadow-soft);
+  --ring: rgba(125, 168, 255, 0.35);
+}
+
+html,
+body {
   height: 100%;
 }
 
 body {
   margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
+  font-family: Inter, Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
-// Styles spécifiques au mode sombre activé sur un élément avec la classe .dark-mode
 .dark-mode {
   @include mat.all-component-colors($dark-theme);
-
-  color: white;
-    .main {
-    background-color: #121212;
-  }
-
-  // 1) Toolbar (hamburger & titre)
-  mat-toolbar {
-    background: linear-gradient(90deg, #001e4d, #003366);
-    color: #cbd6f5;
-  }
-  mat-toolbar button.mat-icon-button {
-    color: #8ab4f8 !important;
-    &:hover {
-      background-color: rgba(255,255,255,0.1) !important;
-    }
-  }
-
-  // 2) Table globale
-  .mat-table {
-    background-color: #1e293b;
-    color: #e0e7ff;
-  }
-  .mat-header-cell {
-    background-color: #334155;
-    color: #a8b7ff;
-    font-weight: 600;
-  }
-  .mat-cell {
-    border-bottom: 1px solid #475569;
-    color: #cbd6f6;
-  }
-  .mat-row:hover {
-    background-color: #33475b !important;
-  }
-  button.mat-raised-button {
-    background-color: mat.m2-get-color-from-palette($dark-primary,700) !important;
-    color: white !important;
-    &:hover {
-      background-color: mat.m2-get-color-from-palette($dark-primary,800) !important;
-    }
-  }
-
-  // 3) Form fields & selects
-  .mat-form-field-appearance-outline .mat-form-field-outline {
-    border-color: #8ab4f8;
-  }
-  .mat-form-field-appearance-outline.mat-focused
-    .mat-form-field-outline-thick {
-    border-color: #3380ff !important;
-  }
-  .mat-form-field-label { color: #8ab4f8 !important; }
-  .mat-form-field-infix,
-  .mat-select-value { color: #fff !important; }
-  .mat-select-arrow { color: #8ab4f8 !important; }
-  .mat-select-panel { background: #0f1a34 !important; color: #d0d9f6 !important; }
-  .mat-option { color: #d0d9f6 !important; }
-  .mat-option:hover,
-  .mat-option.mat-active { background: #1a2d56 !important; color: #fff !important; }
-
-  // 4) Sprint-table paginator
-  .sprint-table {
-    // garde le conteneur transparent
-    .mat-paginator {
-      background: transparent !important;
-      color: #cbd6f6 !important;
-    }
-    // boutons précédents/suivants
-    button.mat-paginator-navigation-previous,
-    button.mat-paginator-navigation-next,
-    button.mat-paginator-navigation-first,
-    button.mat-paginator-navigation-last {
-      background: transparent !important;
-      color: #cbd6f6 !important;
-      &:hover {
-        background: rgba(255,255,255,0.1) !important;
-      }
-    }
-    // select page size
-    .mat-paginator-range-actions .mat-select-trigger {
-      color: #cbd6f6 !important;
-      &:hover {
-        background: rgba(255,255,255,0.1) !important;
-      }
-    }
-  }
-
-  // 5) Burnup-close button
-  .main-content h4 button.mat-icon-button {
-    color: #f87171 !important;
-    &:hover {
-      background: #7f1d1d !important;
-    }
-  }
 }
 
-
-
-
-/* === Styles dark mode Angular Material pour les formulaires === */
-
-.dark-mode .mat-form-field-label {
-  color: #8ab4f8 !important;
+mat-toolbar {
+  background: linear-gradient(120deg, var(--color-surface), var(--color-surface-soft));
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.dark-mode .mat-form-field-infix {
-  color: #ffffff !important;
+mat-sidenav {
+  background: var(--color-surface) !important;
+  border-right: 1px solid var(--color-border);
 }
 
-.dark-mode .mat-select-value {
-  color: #ffffff !important;
+mat-nav-list a.mat-mdc-list-item {
+  color: var(--color-text-muted) !important;
 }
 
-.dark-mode .mat-select-arrow {
-  color: #8ab4f8 !important;
+mat-nav-list a.mat-mdc-list-item.active,
+mat-nav-list a.mat-mdc-list-item:hover {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-text) !important;
 }
 
-.dark-mode .mat-select-panel {
-  background-color: #0f1a34 !important;
-  color: #d0d9f6 !important;
+button.mat-mdc-raised-button,
+button.mat-mdc-unelevated-button {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-soft) !important;
 }
 
-.dark-mode .mat-option {
-  color: #d0d9f6 !important;
+button.mat-mdc-stroked-button {
+  border-radius: var(--radius-md) !important;
 }
 
-.dark-mode .mat-option:hover,
-.dark-mode .mat-option.mat-active {
-  background-color: #1a2d56 !important;
-  color: #ffffff !important;
+.mat-mdc-form-field {
+  width: 100%;
 }
 
-.dark-mode .mat-form-field-appearance-outline .mat-form-field-outline {
-  color: #8ab4f8;
-  border-color: #8ab4f8;
+.mat-mdc-table {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
-.dark-mode .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick {
-  border-color: #3380ff !important;
+.mat-mdc-header-row {
+  background: var(--color-surface-soft);
 }
 
-/* Conteneur général */
-.dark-mode .example-container {
-  background-color: #0b1224;
-  color: #a8b9d8;
-  height: 100vh;
+.mat-mdc-header-cell {
+  color: var(--color-text-muted) !important;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
-/* Sidenav */
-.dark-mode mat-sidenav {
-  background-color: #121d40;
-  color: #c0cde8;
-  box-shadow: 2px 0 12px rgba(0, 0, 50, 0.7);
+.mat-mdc-row:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
 }
 
-/* Liens de navigation */
-.dark-mode mat-nav-list a.mat-list-item {
-  color: #a8b9d8;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* Icônes dans la nav */
-.dark-mode mat-nav-list a.mat-list-item mat-icon {
-  color: #8ab4f8;
-  margin-right: 12px;
-}
-
-/* Hover et actif sur nav items */
-.dark-mode mat-nav-list a.mat-list-item:hover,
-.dark-mode mat-nav-list a.mat-list-item.active {
-  background-color: #1e3a73;
-  color: #cbd6f5;
-}
-
-/* Toolbar */
-.dark-mode mat-toolbar {
-  background: linear-gradient(90deg, #001e4d 0%, #003366 100%);
-  color: #cbd6f5;
-}
-
-
-body:not(.dark-mode) {
-  background-color: #ffffff;
-  color: #000000;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
-
-  // Reset tables
-  .mat-table {
-    background-color: white;
-    color: black;
-  }
-
-  // Reset autres composants si nécessaire
-  .mat-header-cell {
-    background-color: #f1f1f1;
-    color: #333;
-    font-weight: 600;
-  }
-
-  .mat-cell {
-    border-bottom: 1px solid #ddd;
-    color: #000;
-  }
-
-  button.mat-raised-button {
-    background-color: mat.m2-get-color-from-palette(mat.$m2-indigo-palette, 500);
-    color: white;
-
-    &:hover {
-      background-color: mat.m2-get-color-from-palette(mat.$m2-indigo-palette, 700);
-    }
-  }
-
-  // Reset mat-paginator
-  .mat-paginator {
-    background-color: white;
-    color: black;
-  }
-  .mat-paginator-range-label,
-  .mat-paginator-page-size-label,
-  .mat-paginator-navigation-previous,
-  .mat-paginator-navigation-next {
-    color: black;
-  }
-  .mat-paginator-icon {
-    color: black;
-  }
+.mat-mdc-paginator {
+  background: transparent !important;
+  color: var(--color-text-muted) !important;
 }

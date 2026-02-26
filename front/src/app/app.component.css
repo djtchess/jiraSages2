@@ -1,6 +1,21 @@
 .example-container {
   height: 100vh;
+  background: var(--color-bg);
 }
 
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
 
+.main-content {
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: calc(100vh - 64px);
+  padding: 1rem;
+}
 
+.theme-toggle {
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+  background: var(--color-surface) !important;
+}

@@ -280,3 +280,151 @@ echarts {
   height: 420px;   /* ou 360/480 selon ta préférence */
   min-height: 320px;
 }
+
+
+/* --- Modern buttons + dark tables improvements --- */
+.export-actions {
+  margin: 8px 0 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  border-radius: 12px !important;
+  border-width: 1.5px !important;
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border)) !important;
+  color: var(--color-primary) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 86%, white), var(--color-surface)) !important;
+  box-shadow: 0 6px 14px rgba(24, 46, 94, 0.14) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1px;
+  transition: transform 120ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.export-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(35, 76, 160, 0.2) !important;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)), var(--color-surface)) !important;
+}
+
+.export-btn:active {
+  transform: translateY(0);
+}
+
+.export-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring), 0 8px 16px rgba(35, 76, 160, 0.24) !important;
+}
+
+[data-theme='dark'] .kpi-card {
+  background: linear-gradient(145deg, #0f1b33, #101d36 60%, #0d1730);
+  border: 1px solid #2e446f;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='dark'] .kpi-header h3 {
+  color: #d9e7ff;
+}
+
+[data-theme='dark'] .kpi-summary-table td {
+  color: #d7e3fb;
+  border-bottom-color: #2b4066;
+}
+
+[data-theme='dark'] .kpi-summary-table td:first-child {
+  color: #a9c5ff;
+}
+
+[data-theme='dark'] .kpi-block {
+  background: #121f39;
+  border-color: #2f476f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+[data-theme='dark'] .kpi-block h4 {
+  color: #d3e4ff;
+  border-bottom-color: #4f7ec9;
+}
+
+[data-theme='dark'] .kpi-table th {
+  background-color: #1a2c4a;
+  color: #d5e5ff;
+  border-bottom-color: #37507b;
+}
+
+[data-theme='dark'] .kpi-table td,
+[data-theme='dark'] .kpi-summary-table td {
+  border-bottom-color: #2b4066;
+}
+
+[data-theme='dark'] .kpi-table td:first-child {
+  color: #d7e3fb;
+}
+
+[data-theme='dark'] .kpi-table td {
+  color: #c4d7ff;
+}
+
+[data-theme='dark'] .kpi-toggle-buttons button:hover {
+  background-color: rgba(164, 196, 255, 0.12);
+}
+
+[data-theme='dark'] .export-btn {
+  border-color: #5f84d9 !important;
+  color: #e8f0ff !important;
+  background: linear-gradient(160deg, #1b2c52, #152443) !important;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+[data-theme='dark'] .export-btn:hover {
+  background: linear-gradient(160deg, #233a6b, #1b2f57) !important;
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.38) !important;
+}
+
+:host-context([data-theme='dark']) .kpi-card,
+:host-context(.dark-mode) .kpi-card {
+  background: linear-gradient(145deg, #0f1b33, #101d36 60%, #0d1730) !important;
+  border: 1px solid #2e446f !important;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35) !important;
+}
+
+:host-context([data-theme='dark']) .kpi-summary-table,
+:host-context(.dark-mode) .kpi-summary-table {
+  background: #121f39;
+}
+
+:host-context([data-theme='dark']) .kpi-summary-table td,
+:host-context(.dark-mode) .kpi-summary-table td {
+  color: #d7e3fb !important;
+  border-bottom-color: #2b4066 !important;
+}
+
+:host-context([data-theme='dark']) .kpi-summary-table td:first-child,
+:host-context(.dark-mode) .kpi-summary-table td:first-child {
+  color: #a9c5ff !important;
+}
+
+:host-context([data-theme='dark']) .kpi-block,
+:host-context(.dark-mode) .kpi-block {
+  background: #121f39 !important;
+  border-color: #2f476f !important;
+}
+
+:host-context([data-theme='dark']) .kpi-table,
+:host-context(.dark-mode) .kpi-table {
+  background: #121f39;
+}
+
+:host-context([data-theme='dark']) .kpi-table th,
+:host-context(.dark-mode) .kpi-table th {
+  background-color: #1a2c4a !important;
+  color: #d5e5ff !important;
+}
+
+:host-context([data-theme='dark']) .kpi-table td,
+:host-context(.dark-mode) .kpi-table td {
+  color: #c4d7ff !important;
+  border-bottom-color: #2b4066 !important;
+}

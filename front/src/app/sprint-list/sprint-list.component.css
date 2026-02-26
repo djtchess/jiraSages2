@@ -1,193 +1,36 @@
-/* ---------------------- */
-/* Palette & variables    */
-/* ---------------------- */
-:root {
-  --card-bg: #ffffff;
-  --table-border: #e9eef5;
-  --row-hover: #f5f9ff;
-  --row-zebra: #fafcff;
-  --header-bg: #f0f5ff;
-  --header-text: #0d1b2a;
-  --text-muted: #5c6b7a;
-  --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --radius: 14px;
-}
-
-/* Conteneur global */
 .sprint-table {
-  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 1rem;
 }
 
-/* Carte/contour + scroll horizontal si nécessaire */
-.sprint-table .table-card {
-  background: var(--card-bg);
-  border: 1px solid var(--table-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.sprint-table .table-scroll {
-  overflow-x: auto;
-}
-
-/* ---------------------- */
-/* Table Material (MDC)   */
-/* ---------------------- */
-table.modern-table {
+.modern-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: var(--card-bg);
-}
-
-/* En-tête sticky + style */
-.modern-table th.mat-header-cell {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--header-bg);
-  color: var(--header-text);
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: .2px;
-  border-bottom: 1px solid var(--table-border);
-  /* première et dernière cellules arrondies */
-}
-.modern-table thead tr:first-child th.mat-header-cell:first-child {
-  border-top-left-radius: var(--radius);
-}
-.modern-table thead tr:first-child th.mat-header-cell:last-child {
-  border-top-right-radius: var(--radius);
-}
-
-/* Cellules */
-.modern-table td.mat-cell, 
-.modern-table th.mat-header-cell {
-  padding: 12px 14px; /* densité confortable */
-  white-space: nowrap;
-  border-bottom: 1px solid var(--table-border);
-}
-
-/* Zébrage + hover */
-.modern-table tr.mat-row:nth-child(even) td.mat-cell {
-  background: var(--row-zebra);
-}
-.modern-table tr.mat-row:hover td.mat-cell {
-  background: var(--row-hover);
-}
-
-/* ID un peu atténué, dates alignées à droite (option) */
-.modern-table td.mat-cell:nth-child(1) { 
-  color: var(--text-muted);
-}
-.modern-table [mat-column-startDate],
-.modern-table [mat-column-endDate] {
-  text-align: right;
-}
-
-/* Actions côte à côte */
-.action-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 8px;
-}
-
-
-
-
-/* Boutons (tu avais déjà une base, on complète un peu) */
-button {
-  text-transform: none;
-}
-button[mat-raised-button],
-button[mat-stroked-button] {
-  display: inline-flex;          /* côte à côte */
-  align-items: center;
-  gap: 6px;
-  border-radius: 10px;
-}
-
-/* Hover doux (material gère déjà les couleurs) */
-button[mat-raised-button]:hover {
-  filter: brightness(0.98);
-}
-
-/* Bouton “close” rond (déjà ok) */
-button[mat-icon-button] {
-  border-radius: 50%;
-  transition: background-color 0.25s ease;
-}
-button[mat-icon-button]:hover {
-  background-color: rgba(255, 0, 0, 0.12);
-}
-
-/* Paginator harmonisé */
-.mat-mdc-paginator {
-  border-top: 1px solid var(--table-border);
   background: transparent;
-  padding: 8px 12px;
 }
 
-/* Responsive : quand l’écran est étroit, on autorise le scroll */
-@media (max-width: 900px) {
-  .sprint-table {
-    padding: 8px;
-  }
-  .modern-table td.mat-cell, 
-  .modern-table th.mat-header-cell {
-    padding: 10px 12px;
-  }
-}
-
-
-/* Densité uniforme via variables Angular Material (MDC) */
-.mat-mdc-table {
-  --mat-table-row-item-container-height: 48px;   /* lignes */
-  --mat-table-header-row-height: 48px;           /* en-tête */
-}
-
-/* Sécurise la ligne & les cellules (pas de surhauteur via padding) */
-.mat-mdc-header-row,
-.mat-mdc-row { height: 48px; }
-
-.mat-mdc-table .mat-mdc-header-cell,
-.mat-mdc-table .mat-mdc-cell {
-  padding-top: 0;
-  padding-bottom: 0;
-  box-sizing: border-box;
+.action-buttons-cell {
   vertical-align: middle;
 }
 
-/* Colonne Actions : flex horizontal sans étirer la ligne */
-td.mat-mdc-cell.action-buttons {
+.action-buttons-content {
   display: flex;
-  align-items: center;  /* centre vertical */
-  gap: 8px;
-  height: 48px;         /* cohérent avec la ligne */
-  box-sizing: border-box;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-/* Normalise les boutons MDC pour ne pas pousser la hauteur */
-td.action-buttons .mat-mdc-button-base {
-  height: 36px;         /* conteneur bouton */
+.action-buttons-content .mat-mdc-button-base {
   min-height: 36px;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin: 0;
-  line-height: 1;       /* évite l'effet de “label” trop haut */
-  align-items: center;  /* sécurité de centrage */
-}
-
-/* Icônes bien centrées, pas de surhauteur */
-td.action-buttons .mat-icon {
-  font-size: 20px;
   line-height: 1;
 }
 
-/* (Option) Si tu vois encore 1px d'écart avec outlined/stroked: bordure incluse */
-td.action-buttons .mat-mdc-outlined-button {
-  box-sizing: border-box;
+h4 {
+  color: var(--color-text);
+}
+
+h4 button.mat-mdc-icon-button {
+  color: var(--color-danger) !important;
 }

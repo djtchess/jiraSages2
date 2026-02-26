@@ -1,20 +1,6 @@
 /* =========================
    Thème (facile à ajuster)
    ========================= */
-:root {
-  --bg: #ffffff;
-  --card: #ffffff;
-  --text: #111827;          /* sombre -> meilleur contraste */
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-
-  --primary: #1d4ed8;       /* bleu soutenu */
-  --primary-600: #1a44c6;
-  --primary-700: #163aa8;
-  --ring: rgba(29, 78, 216, 0.28);
-}
-
 /* =========================
    Disposition globale
    ========================= */
@@ -24,8 +10,8 @@
   gap: 2rem;
   align-items: start;
   padding: 1rem;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Empilement en mobile / écrans étroits */
@@ -66,7 +52,7 @@
   text-align: center;
   margin-bottom: 1rem;
   width: 100%;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 /* =========================
@@ -81,8 +67,8 @@
   min-width: 240px;
 
   padding: 1.1rem 1.1rem 1.25rem;
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   box-shadow: var(--shadow);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -97,7 +83,7 @@
   content: "";
   display: block;
   height: 5px;
-  background: linear-gradient(90deg, var(--primary), #6ee7b7, #60a5fa);
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent), #60a5fa);
 }
 
 /* En mobile, on retire le sticky */
@@ -109,13 +95,13 @@
   margin: 0.8rem 0 0.25rem;
   font-size: 1.05rem;
   letter-spacing: 0.2px;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 .info-box p {
   margin: 0.5rem 0;
   font-size: 0.98rem;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 /* =========================
@@ -133,7 +119,7 @@
 }
 
 .stat {
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 0.85rem 0.9rem;
   background: linear-gradient(180deg, #ffffff, #f8fafc);
@@ -144,14 +130,14 @@
   font-size: 1.55rem;
   font-weight: 800;
   line-height: 1.2;
-  color: var(--text);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums; /* alignement des chiffres */
 }
 
 .stat-label {
   margin-top: 0.25rem;
   font-size: 0.86rem;
-  color: var(--muted);
+  color: var(--color-text-muted);
   letter-spacing: 0.2px;
 }
 
@@ -164,10 +150,10 @@
 }
 .kpi-badge {
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--color-text-muted);
   background: #f9fafb;
 }
 
@@ -186,9 +172,9 @@
 
   padding: 0.85rem 1.1rem;
   width: 100%;               /* pleine largeur = lisible */
-  background: var(--primary);
-  color: #ad0bc2;
-  border: 2px solid var(--primary-700); /* bord net pour le contraste */
+  background: var(--color-primary);
+  color: #ffffff;
+  border: 2px solid var(--color-primary-strong); /* bord net pour le contraste */
   border-radius: 12px;
 
   font-weight: 700;
@@ -215,7 +201,7 @@
 
 /* Survol : léger éclaircissement et ombre plus marquée */
 .save-btn:hover {
-  background: var(--primary-600);
+  background: var(--color-primary-strong);
   box-shadow: 0 10px 18px rgba(29, 78, 216, 0.28);
   filter: brightness(1.03);
 }
@@ -239,4 +225,34 @@
   cursor: not-allowed;
   box-shadow: none;
   opacity: 0.9;
+}
+
+:host-context([data-theme='dark']) .info-box,
+:host-context(.dark-mode) .info-box {
+  background: linear-gradient(160deg, #12203a, #101b31);
+  border-color: #2e446d;
+}
+
+:host-context([data-theme='dark']) .stat,
+:host-context(.dark-mode) .stat {
+  background: linear-gradient(180deg, #1a2b4a, #14233d);
+  border-color: #355180;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:host-context([data-theme='dark']) .stat-value,
+:host-context(.dark-mode) .stat-value {
+  color: #eaf1ff;
+}
+
+:host-context([data-theme='dark']) .stat-label,
+:host-context(.dark-mode) .stat-label {
+  color: #aecaef;
+}
+
+:host-context([data-theme='dark']) .kpi-badge,
+:host-context(.dark-mode) .kpi-badge {
+  background: #1a2d4f;
+  border-color: #3d5c92;
+  color: #d6e6ff;
 }

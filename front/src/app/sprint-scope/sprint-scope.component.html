@@ -18,12 +18,12 @@
     </div>
   </div>
 
-  <div class="export-actions" style="margin:8px 0 16px; display:flex; gap:8px; flex-wrap:wrap;">
-  <button mat-stroked-button color="primary" (click)="exportToPptx()">Exporter en PowerPoint</button>
-  <button mat-stroked-button color="primary" (click)="exportToPptxWithKpiScreenshot()">
+  <div class="export-actions export-actions--primary">
+  <button mat-stroked-button color="primary" class="export-btn" (click)="exportToPptx()">Exporter en PowerPoint</button>
+  <button mat-stroked-button color="primary" class="export-btn" (click)="exportToPptxWithKpiScreenshot()">
   Exporter en PowerPoint (capture tableaux)
 </button>
-<button mat-stroked-button color="primary" (click)="downloadKpiTablesPng()">
+<button mat-stroked-button color="primary" class="export-btn" (click)="downloadKpiTablesPng()">
   Télécharger l'image (tableaux)
 </button>
 
@@ -117,10 +117,10 @@
 </ng-container>
 <br/>
 
-<div class="export-actions" style="margin:8px 0 16px; display:flex; gap:8px; flex-wrap:wrap;">
-  <button mat-stroked-button color="primary" (click)="exportAllToHtml()">Exporter en HTML</button>
-  <button mat-stroked-button color="primary" (click)="exportAllToXlsx()">Exporter en XLSX</button>
-  <button mat-stroked-button color="primary" (click)="exportAllToPdf()">Exporter en PDF</button>
+<div class="export-actions export-actions--primary">
+  <button mat-stroked-button color="primary" class="export-btn" (click)="exportAllToHtml()">Exporter en HTML</button>
+  <button mat-stroked-button color="primary" class="export-btn" (click)="exportAllToXlsx()">Exporter en XLSX</button>
+  <button mat-stroked-button color="primary" class="export-btn" (click)="exportAllToPdf()">Exporter en PDF</button>
 </div>
 
 
