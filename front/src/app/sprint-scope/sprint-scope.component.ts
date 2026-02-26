@@ -1,4 +1,4 @@
-import { Component, Input, OnInit} from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import {  SprintInfo, Ticket } from '../../model/SprintInfo.model';
 import { JiraService } from '../../service/jira.service';
 import { TicketTableComponent } from "../ticket-table/ticket-table.component";
@@ -8,6 +8,8 @@ import { MatCardModule } from '@angular/material/card';
 import { EChartsOption, PieSeriesOption } from 'echarts';
 import { NgxEchartsModule, NGX_ECHARTS_CONFIG } from 'ngx-echarts';
 import * as echarts from 'echarts'; // ✅ Import pour typage strict
+import { Subscription } from 'rxjs';
+import { ThemeService } from '../theme.service';
 
 type TypeCountMap = Record<string, { nbTickets: number; nbStoryPoints: number }>;
 
@@ -24,7 +26,7 @@ type TypeCountMap = Record<string, { nbTickets: number; nbStoryPoints: number }>
   templateUrl: './sprint-scope.component.html',
   styleUrl: './sprint-scope.component.css'
 })
-export class SprintScopeComponent implements OnInit {
+export class SprintScopeComponent implements OnInit, OnDestroy {
   @Input() sprintId!: string;
   sprintInfo?: SprintInfo;
 
@@ -50,7 +52,12 @@ export class SprintScopeComponent implements OnInit {
   }
 
 
-  constructor(private jiraService: JiraService) {}
+  private themeSub?: Subscription;
+
+  constructor(
+    private jiraService: JiraService,
+    private themeService: ThemeService,
+  ) {}
 
   ngOnInit(): void {
     this.jiraService.getSprintFullInfo(this.sprintId).subscribe(data => {
@@ -59,6 +66,15 @@ export class SprintScopeComponent implements OnInit {
       this.updateKpiChart();
       this.updateTicketTypeChart();
     });
+
+    this.themeSub = this.themeService.activeTheme$.subscribe(() => {
+      this.updateKpiChart();
+      this.updateTicketTypeChart();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.themeSub?.unsubscribe();
   }
 
   onChartInit(id: 'kpi' | 'typeSp' | 'typeNb', ec: echarts.ECharts): void {
@@ -77,13 +93,24 @@ export class SprintScopeComponent implements OnInit {
   updateKpiChart(): void {
     if (!this.sprintInfo?.sprintKpiInfo) return;
 
+    const chartTheme = this.getChartTheme();
+
     this.kpiChartOptions = {
-      title: { text: 'Indicateurs principaux', left: 'center' },
+      title: {
+        text: 'Indicateurs principaux',
+        left: 'center',
+        textStyle: { color: chartTheme.titleColor, fontWeight: 700 }
+      },
       tooltip: {
         trigger: 'item',
+        textStyle: { color: chartTheme.labelColor },
         formatter: (params: any) => `${params.name}: ${params.value.toFixed(1)}%`
       },
-      legend: { bottom: '0', left: 'center' },
+      legend: {
+        bottom: '0',
+        left: 'center',
+        textStyle: { color: chartTheme.legendColor }
+      },
       series: [
         {
           name: 'KPIs',
@@ -95,8 +122,21 @@ export class SprintScopeComponent implements OnInit {
             { value: this.sprintInfo?.sprintKpiInfo.ajoutsNonPrevusPourcent, name: 'Ajouts en cours' },
             { value: this.sprintInfo?.sprintKpiInfo.nonTerminesEngagesPourcent, name: 'Engagés non terminés' }
           ],
-          label: { formatter: '{b}\n{d}%', fontSize: 12 },
-          emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.3)' } }
+          label: {
+            formatter: '{b}\n{d}%',
+            fontSize: 13,
+            fontWeight: 700,
+            color: chartTheme.labelColor,
+            textBorderColor: chartTheme.labelHaloColor,
+            textBorderWidth: 3
+          },
+          labelLine: {
+            lineStyle: { color: chartTheme.labelLineColor, width: 1.5 }
+          },
+          emphasis: {
+            label: { color: chartTheme.labelColor, textBorderColor: chartTheme.labelHaloColor, textBorderWidth: 4 },
+            itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.3)' }
+          }
         }
       ]
     };
@@ -138,6 +178,8 @@ export class SprintScopeComponent implements OnInit {
       itemStyle: { color: this.TICKET_TYPE_COLORS[type] ?? this.stringToColor(type) }
     }));
 
+    const chartTheme = this.getChartTheme();
+
     /* ---------- Paramètres communs ---------- */
     const basePie: Partial<PieSeriesOption> = {
       type: 'pie',
@@ -145,26 +187,61 @@ export class SprintScopeComponent implements OnInit {
       avoidLabelOverlap: true,
       itemStyle: {
         borderRadius: 6,
-        borderColor: '#fff',
+        borderColor: chartTheme.sliceBorderColor,
         borderWidth: 2
       },
-      label: { formatter: '{b}\n{d}%', fontSize: 12 }
+      label: {
+        formatter: '{b}\n{d}%',
+        fontSize: 13,
+        fontWeight: 700,
+        color: chartTheme.labelColor,
+        textBorderColor: chartTheme.labelHaloColor,
+        textBorderWidth: 3
+      },
+      labelLine: {
+        lineStyle: { color: chartTheme.labelLineColor, width: 1.5 }
+      },
+      emphasis: {
+        label: { color: chartTheme.labelColor, textBorderColor: chartTheme.labelHaloColor, textBorderWidth: 4 }
+      }
     };
 
     /* ---------- Story-points par type ---------- */
     this.ticketTypeChartOptions = <EChartsOption>{
-      title: { text: 'Répartition Story-Points par type de ticket', left: 'center' },
-      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: 0, left: 'center' },
+      title: { text: 'Répartition Story-Points par type de ticket', left: 'center', textStyle: { color: chartTheme.titleColor, fontWeight: 700 } },
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', textStyle: { color: chartTheme.labelColor } },
+      legend: { bottom: 0, left: 'center', textStyle: { color: chartTheme.legendColor } },
       series: [{ ...basePie, name: 'Types', data: dataSP }]
     };
 
     /* ---------- Nombre de tickets par type ---------- */
     this.ticketNbTypeChartOptions = <EChartsOption>{
-      title: { text: 'Répartition Nombre de tickets par type', left: 'center' },
-      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: 0, left: 'center' },
+      title: { text: 'Répartition Nombre de tickets par type', left: 'center', textStyle: { color: chartTheme.titleColor, fontWeight: 700 } },
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', textStyle: { color: chartTheme.labelColor } },
+      legend: { bottom: 0, left: 'center', textStyle: { color: chartTheme.legendColor } },
       series: [{ ...basePie, name: 'Types', data: dataNB }]
+    };
+  }
+
+
+  private getChartTheme(): {
+    titleColor: string;
+    legendColor: string;
+    labelColor: string;
+    labelLineColor: string;
+    labelHaloColor: string;
+    sliceBorderColor: string;
+  } {
+    const styles = getComputedStyle(document.documentElement);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    return {
+      titleColor: styles.getPropertyValue('--color-text').trim() || (isDark ? '#f3f6ff' : '#1a2238'),
+      legendColor: styles.getPropertyValue('--color-text-muted').trim() || (isDark ? '#d3def8' : '#47526c'),
+      labelColor: isDark ? '#f8fbff' : '#1f2a3f',
+      labelLineColor: isDark ? '#dce8ff' : '#667899',
+      labelHaloColor: isDark ? '#091327' : '#ffffff',
+      sliceBorderColor: isDark ? '#d9e7ff' : '#ffffff',
     };
   }
 
