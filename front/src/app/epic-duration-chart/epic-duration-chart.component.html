@@ -1,0 +1,74 @@
+<div *ngIf="isLoading" class="loading-wrapper">
+  <mat-spinner diameter="36"></mat-spinner>
+</div>
+
+<div *ngIf="!isLoading" class="epic-view">
+  <div class="kpis">
+    <div class="kpi-card">
+      <span class="kpi-label">Epics affichés</span>
+      <span class="kpi-value">{{ filteredData.length }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Versions disponibles</span>
+      <span class="kpi-value">{{ allVersions.length }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Sprints disponibles</span>
+      <span class="kpi-value">{{ allSprints.length }}</span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-block">
+      <label for="versionFilter">Filtrer par versions</label>
+      <select id="versionFilter" multiple [(ngModel)]="selectedVersions" (change)="applyFilters()">
+        <option *ngFor="let v of allVersions" [ngValue]="v">{{ v }}</option>
+      </select>
+    </div>
+
+    <div class="filter-block">
+      <label for="sprintFilter">Filtrer par sprints</label>
+      <select id="sprintFilter" multiple [(ngModel)]="selectedSprints" (change)="applyFilters()">
+        <option *ngFor="let s of allSprints" [ngValue]="s">{{ s }}</option>
+      </select>
+    </div>
+
+    <button class="reset-btn" (click)="resetFilters()">Réinitialiser</button>
+  </div>
+
+  <div class="actions-row">
+    <button class="export-btn" (click)="exportStandaloneHtml()">Exporter une page HTML autonome</button>
+  </div>
+
+  <div echarts [options]="chartOptions" class="chart"></div>
+
+  <table mat-table [dataSource]="filteredData" class="mat-elevation-z2 table">
+    <ng-container matColumnDef="epicKey">
+      <th mat-header-cell *matHeaderCellDef>Epic</th>
+      <td mat-cell *matCellDef="let row">{{ row.epicKey }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="epicSummary">
+      <th mat-header-cell *matHeaderCellDef>Résumé</th>
+      <td mat-cell *matCellDef="let row">{{ row.epicSummary }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Statut</th>
+      <td mat-cell *matCellDef="let row">{{ row.status }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="versions">
+      <th mat-header-cell *matHeaderCellDef>Versions (tickets enfants)</th>
+      <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="sprints">
+      <th mat-header-cell *matHeaderCellDef>Sprints</th>
+      <td mat-cell *matCellDef="let row">{{ formatSprints(row) }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+</div>

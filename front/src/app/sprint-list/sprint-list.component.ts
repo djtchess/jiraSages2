@@ -45,7 +45,6 @@ export class SprintListComponent implements OnInit {
   selectedScopeSprintId: string | null = null;
   selectedScopeSprintName: string | null = null;
 
-
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   
@@ -85,7 +84,6 @@ export class SprintListComponent implements OnInit {
     this.selectedScopeSprintId = null;
     this.selectedScopeSprintName = null;
   }
-
 
   openCapacityView(boardId: number, nextSprintId: number): void {
     this.router.navigate(['/boards', boardId, 'sprints', nextSprintId, 'capacity']);
