@@ -1,13 +1,15 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { EChartsOption } from 'echarts';
 import { NgxEchartsModule, NGX_ECHARTS_CONFIG } from 'ngx-echarts';
+import { Subscription } from 'rxjs';
 
 import { JiraService } from '../../service/jira.service';
 import { EpicChildTicket, EpicDeliveryOverview } from '../../model/epic-duration.model';
+import { ThemeService } from '../theme.service';
 
 @Component({
   selector: 'app-epic-duration-chart',
@@ -22,7 +24,7 @@ import { EpicChildTicket, EpicDeliveryOverview } from '../../model/epic-duration
   templateUrl: './epic-duration-chart.component.html',
   styleUrl: './epic-duration-chart.component.css'
 })
-export class EpicDurationChartComponent implements OnInit, OnChanges {
+export class EpicDurationChartComponent implements OnInit, OnChanges, OnDestroy {
   @Input() projectKey = 'SAG';
 
   isLoading = false;
@@ -37,11 +39,25 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
   chartOptions: EChartsOption = {};
   selectedEpic: EpicDeliveryOverview | null = null;
   ticketWorklogChartOptions: EChartsOption = {};
+  private themeSub?: Subscription;
 
-  constructor(private jiraService: JiraService) {}
+  constructor(
+    private jiraService: JiraService,
+    private themeService: ThemeService,
+  ) {}
 
   ngOnInit(): void {
     this.loadData();
+    this.themeSub = this.themeService.activeTheme$.subscribe(() => {
+      this.buildChart(this.filteredData);
+      if (this.selectedEpic) {
+        this.buildTicketWorklogChart(this.selectedEpic.childTickets || []);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.themeSub?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -626,22 +642,24 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
     return (row.developers || []).join(', ');
   }
   private buildTicketWorklogChart(tickets: EpicChildTicket[]): void {
+    const theme = this.getChartTheme();
     this.ticketWorklogChartOptions = {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      xAxis: { type: 'category', data: tickets.map(t => t.ticketKey), axisLabel: { rotate: 35 } },
-      yAxis: { type: 'value', name: 'Jours passés' },
+      xAxis: { type: 'category', data: tickets.map(t => t.ticketKey), axisLabel: { rotate: 35, color: theme.axisColor }, axisLine: { lineStyle: { color: theme.axisColor } } },
+      yAxis: { type: 'value', name: 'Jours passés', axisLabel: { color: theme.axisColor }, splitLine: { lineStyle: { color: theme.gridColor } } },
       series: [
         {
           name: 'Temps passé',
           type: 'bar',
           data: tickets.map(t => Number(t.timeSpentDays || 0)),
-          itemStyle: { color: '#ef6c00' }
+          itemStyle: { color: theme.timeColor }
         }
       ]
     };
   }
 
   private buildChart(rows: EpicDeliveryOverview[]): void {
+    const theme = this.getChartTheme();
     const epics = rows.map(r => r.epicKey);
     const storyPoints = rows.map(r => Number(r.totalStoryPoints || 0));
     const timeSpentDays = rows.map(r => Number(r.totalTimeSpentDays || 0));
@@ -660,14 +678,26 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
           return `<b>${epic?.epicKey ?? ''}</b><br/>${lines}<br/>Versions tickets enfants: <b>${versions}</b><br/>Sprints: <b>${sprints}</b><br/>Développeurs: <b>${devs}</b>`;
         }
       },
-      legend: { data: ['Story Points', 'Temps (jours)'] },
+      color: [theme.storyColor, theme.timeColor],
+      legend: { data: ['Story Points', 'Temps (jours)'], textStyle: { color: theme.axisColor } },
       grid: { left: '3%', right: '4%', bottom: '8%', containLabel: true },
-      xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35 } },
-      yAxis: { type: 'value', name: 'Valeur' },
+      xAxis: { type: 'category', data: epics, axisLabel: { rotate: 35, color: theme.axisColor }, axisLine: { lineStyle: { color: theme.axisColor } } },
+      yAxis: { type: 'value', name: 'Valeur', axisLabel: { color: theme.axisColor }, splitLine: { lineStyle: { color: theme.gridColor } } },
       series: [
-        { name: 'Story Points', type: 'bar', data: storyPoints, itemStyle: { color: '#1976d2' } },
-        { name: 'Temps (jours)', type: 'bar', data: timeSpentDays, itemStyle: { color: '#ef6c00' } }
+        { name: 'Story Points', type: 'bar', data: storyPoints, itemStyle: { color: theme.storyColor } },
+        { name: 'Temps (jours)', type: 'bar', data: timeSpentDays, itemStyle: { color: theme.timeColor } }
       ]
     };
   }
+
+  private getChartTheme(): { axisColor: string; gridColor: string; storyColor: string; timeColor: string } {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      axisColor: styles.getPropertyValue('--chart-axis').trim() || '#5c6f90',
+      gridColor: styles.getPropertyValue('--chart-grid').trim() || 'rgba(76, 103, 153, 0.2)',
+      storyColor: styles.getPropertyValue('--chart-story').trim() || '#3563ff',
+      timeColor: styles.getPropertyValue('--chart-time').trim() || '#ff8a3d',
+    };
+  }
+
 }

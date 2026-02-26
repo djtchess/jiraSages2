@@ -1,10 +1,7 @@
-<div [class.dark-mode]="darkMode">
-
+<div>
   <mat-sidenav-container class="example-container" autosize>
-
     <mat-sidenav #drawer mode="side" opened>
       <mat-nav-list>
-
         <a mat-list-item [routerLink]="'/'" routerLinkActive="active">
           <mat-icon>home</mat-icon>
           Accueil
@@ -24,20 +21,23 @@
           <mat-icon>bar_chart</mat-icon>
           Durée épics
         </a>
-
       </mat-nav-list>
     </mat-sidenav>
 
     <mat-sidenav-content>
-
       <mat-toolbar>
         <button mat-icon-button (click)="drawer.toggle()" aria-label="Toggle menu">
           <mat-icon>menu</mat-icon>
         </button>
 
-        <span style="flex: 1 1 auto;"></span> <!-- pousse le bouton à droite -->
+        <span class="toolbar-spacer"></span>
 
-        <button mat-stroked-button color="accent" (click)="toggleDarkMode()" aria-label="Toggle dark mode">
+        <button
+          mat-stroked-button
+          class="theme-toggle"
+          (click)="toggleDarkMode()"
+          aria-label="Toggle dark mode"
+        >
           <mat-icon>{{ darkMode ? 'dark_mode' : 'light_mode' }}</mat-icon>
           {{ darkMode ? 'Mode Clair' : 'Mode Sombre' }}
         </button>
@@ -46,9 +46,6 @@
       <div class="main-content">
         <router-outlet></router-outlet>
       </div>
-
     </mat-sidenav-content>
-
   </mat-sidenav-container>
-
 </div>
