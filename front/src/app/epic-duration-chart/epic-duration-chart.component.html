@@ -101,6 +101,10 @@
         <th mat-header-cell *matHeaderCellDef>Résumé</th>
         <td mat-cell *matCellDef="let t">{{ t.summary }}</td>
       </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Statut ticket</th>
+        <td mat-cell *matCellDef="let t">{{ t.status }}</td>
+      </ng-container>
       <ng-container matColumnDef="storyPoints">
         <th mat-header-cell *matHeaderCellDef>Story Points</th>
         <td mat-cell *matCellDef="let t">{{ t.storyPoints | number:'1.2-2' }}</td>
@@ -114,8 +118,8 @@
         <td mat-cell *matCellDef="let t">{{ t.developers.join(', ') }}</td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','storyPoints','timeSpentDays','developers']"></tr>
-      <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','storyPoints','timeSpentDays','developers']"></tr>
+      <tr mat-header-row *matHeaderRowDef="['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['ticketKey','summary','status','storyPoints','timeSpentDays','developers']"></tr>
     </table>
   </div>
 </div>

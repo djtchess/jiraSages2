@@ -7,6 +7,7 @@ export interface EpicChildTicket {
   ticketKey: string;
   ticketUrl: string;
   summary: string;
+  status: string;
   storyPoints: number;
   timeSpentDays: number;
   developers: string[];

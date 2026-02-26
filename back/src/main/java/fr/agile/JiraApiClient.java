@@ -534,7 +534,7 @@ public class JiraApiClient {
             String epicSummary = fields.path("summary").asText("Sans résumé");
             String status = fields.path("status").path("name").asText("Inconnu");
 
-            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "customfield_10020", "fixVersions", "customfield_10028"));
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "status", "customfield_10020", "fixVersions", "customfield_10028"));
 
             Set<String> versionSet = new TreeSet<>();
             Set<String> developersSet = new TreeSet<>();
@@ -546,6 +546,7 @@ public class JiraApiClient {
                 JsonNode fieldsChild = childIssue.path("fields");
                 String childKey = childIssue.path("key").asText();
                 String childSummary = fieldsChild.path("summary").asText("Sans résumé");
+                String childStatus = fieldsChild.path("status").path("name").asText("Inconnu");
 
                 JsonNode fixVersions = fieldsChild.path("fixVersions");
                 if (fixVersions.isArray()) {
@@ -570,6 +571,7 @@ public class JiraApiClient {
                         childKey,
                         JIRA_URL + "/browse/" + childKey,
                         childSummary,
+                        childStatus,
                         BurnupUtils.roundToTwoDecimals(storyPoints),
                         timeSpentDays,
                         ws.developers()

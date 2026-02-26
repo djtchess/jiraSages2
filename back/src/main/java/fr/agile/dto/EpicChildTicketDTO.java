@@ -6,6 +6,7 @@ public record EpicChildTicketDTO(
         String ticketKey,
         String ticketUrl,
         String summary,
+        String status,
         double storyPoints,
         double timeSpentDays,
         List<String> developers
