@@ -534,7 +534,7 @@ public class JiraApiClient {
             String epicSummary = fields.path("summary").asText("Sans résumé");
             String status = fields.path("status").path("name").asText("Inconnu");
 
-            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "status", "customfield_10020", "fixVersions", "customfield_10028"));
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "status", "assignee", "customfield_10020", "fixVersions", "customfield_10028"));
 
             Set<String> versionSet = new TreeSet<>();
             Set<String> developersSet = new TreeSet<>();
@@ -547,6 +547,7 @@ public class JiraApiClient {
                 String childKey = childIssue.path("key").asText();
                 String childSummary = fieldsChild.path("summary").asText("Sans résumé");
                 String childStatus = fieldsChild.path("status").path("name").asText("Inconnu");
+                String childAssignee = extractDisplayName(fieldsChild.path("assignee"));
 
                 JsonNode fixVersions = fieldsChild.path("fixVersions");
                 if (fixVersions.isArray()) {
@@ -562,7 +563,8 @@ public class JiraApiClient {
                 double storyPoints = storyPointsRaw != null ? storyPointsRaw : 0.0;
 
                 WorklogSummary ws = getWorklogSummary(childKey);
-                developersSet.addAll(ws.developers());
+                List<String> ticketDevelopers = mergeDevelopers(ws.developers(), childAssignee);
+                developersSet.addAll(ticketDevelopers);
                 double timeSpentDays = BurnupUtils.roundToTwoDecimals(ws.totalSeconds() / 28800.0);
                 totalStoryPoints += storyPoints;
                 totalTimeSpentDays += timeSpentDays;
@@ -574,7 +576,7 @@ public class JiraApiClient {
                         childStatus,
                         BurnupUtils.roundToTwoDecimals(storyPoints),
                         timeSpentDays,
-                        ws.developers()
+                        ticketDevelopers
                 ));
             }
             List<String> versions = versionSet.isEmpty() ? List.of("Sans version") : new ArrayList<>(versionSet);
@@ -706,6 +708,46 @@ public class JiraApiClient {
             String parentJql = String.format("project = %s AND parent = \"%s\"", projectKey, epicKey);
             return searchIssuesByJql(parentJql, fields);
         }
+    }
+
+    private String extractDisplayName(JsonNode userNode) {
+        if (userNode == null || userNode.isMissingNode() || userNode.isNull()) {
+            return null;
+        }
+
+        String displayName = userNode.path("displayName").asText(null);
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+
+        String name = userNode.path("name").asText(null);
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+
+        String accountId = userNode.path("accountId").asText(null);
+        if (accountId != null && !accountId.isBlank()) {
+            return accountId;
+        }
+
+        return null;
+    }
+
+    private List<String> mergeDevelopers(List<String> worklogDevelopers, String assignee) {
+        Set<String> merged = new TreeSet<>();
+        if (worklogDevelopers != null) {
+            merged.addAll(worklogDevelopers.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .toList());
+        }
+
+        if (assignee != null && !assignee.isBlank()) {
+            merged.add(assignee.trim());
+        }
+
+        return new ArrayList<>(merged);
     }
 
     private Set<Long> extractSprintIdsFromIssues(List<JsonNode> childIssues) {
