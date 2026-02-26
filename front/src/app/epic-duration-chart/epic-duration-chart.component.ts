@@ -103,8 +103,510 @@ export class EpicDurationChartComponent implements OnInit, OnChanges {
       generatedAt: new Date().toISOString(),
       rows: this.data
     };
-    const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Epics - Sprints & Versions</title><script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script><style>body{font-family:Arial,sans-serif;margin:16px;background:#f6f8ff}.kpis{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr));gap:12px;margin-bottom:12px}.card{background:#fff;border:1px solid #dce3ff;border-radius:10px;padding:12px}.label{color:#5f6b85;font-size:12px}.value{font-weight:700;font-size:20px;color:#1f2f56}.filters{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;background:#fff;border:1px solid #dce3ff;border-radius:10px;padding:12px;margin-bottom:12px}select{min-height:90px;width:100%}button{height:40px;border:none;background:#3f51b5;color:#fff;border-radius:8px;padding:0 12px;cursor:pointer}#chart,#ticketChart{width:100%;height:480px;background:#fff;border-radius:10px;border:1px solid #dce3ff;margin-bottom:12px}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #dce3ff}th,td{border-bottom:1px solid #edf0fb;padding:8px;text-align:left}th{background:#f2f5ff}.section{margin-top:12px}</style></head><body><h2>Epics livrés - Projet ${this.projectKey}</h2><div class="kpis"><div class="card"><div class="label">Epics affichés</div><div class="value" id="kpiEpics">0</div></div><div class="card"><div class="label">Versions disponibles</div><div class="value" id="kpiVersions">0</div></div><div class="card"><div class="label">Sprints disponibles</div><div class="value" id="kpiSprints">0</div></div></div><div class="filters"><div><label>Filtrer par versions</label><select id="versionFilter" multiple></select></div><div><label>Filtrer par sprints</label><select id="sprintFilter" multiple></select></div><div style="display:flex;align-items:end;"><button id="resetBtn">Réinitialiser</button></div></div><div id="chart"></div><table><thead><tr><th>Epic</th><th>Résumé</th><th>Versions</th><th>Story Points</th><th>Temps (jours)</th><th>Développeurs</th></tr></thead><tbody id="rows"></tbody></table><div class="section"><h3 id="selectedEpicTitle">Détails ticket enfant</h3><div id="ticketChart"></div><table><thead><tr><th>Ticket</th><th>Résumé</th><th>Statut ticket</th><th>Story Points</th><th>Temps passé (j)</th><th>Développeurs</th></tr></thead><tbody id="ticketRows"></tbody></table></div><script>const raw=${JSON.stringify(payload)};let selectedVersions=[],selectedSprints=[],selectedEpicIndex=0;const data=raw.rows||[];const allVersions=[...new Set(data.flatMap(r=>r.versionNames||[]))].sort();const allSprints=[...new Set(data.flatMap(r=>(r.sprintDeliveries||[]).map(s=>s.sprintName)))].sort();const versionFilter=document.getElementById('versionFilter');const sprintFilter=document.getElementById('sprintFilter');allVersions.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;versionFilter.appendChild(o)});allSprints.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sprintFilter.appendChild(o)});const chart=echarts.init(document.getElementById('chart'));const ticketChart=echarts.init(document.getElementById('ticketChart'));function getFiltered(){return data.filter(r=>{const versionOk=selectedVersions.length===0||(r.versionNames||[]).some(v=>selectedVersions.includes(v));const sprints=(r.sprintDeliveries||[]).map(s=>s.sprintName);const sprintOk=selectedSprints.length===0||sprints.some(s=>selectedSprints.includes(s));return versionOk&&sprintOk;});}function renderTicket(rows){const epic=rows[selectedEpicIndex]||rows[0];document.getElementById('selectedEpicTitle').textContent=epic?('Détails tickets enfants - '+epic.epicKey):'Détails ticket enfant';const ticketRows=document.getElementById('ticketRows');ticketRows.innerHTML='';const tickets=(epic&&epic.childTickets)||[];tickets.forEach(t=>{const tr=document.createElement('tr');tr.innerHTML='<td><a href="'+t.ticketUrl+'" target="_blank" rel="noopener">'+t.ticketKey+'</a></td><td>'+t.summary+'</td><td>'+(t.status||'Inconnu')+'</td><td>'+Number(t.storyPoints||0).toFixed(2)+'</td><td>'+Number(t.timeSpentDays||0).toFixed(2)+'</td><td>'+(t.developers||[]).join(', ')+'</td>';ticketRows.appendChild(tr);});ticketChart.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},xAxis:{type:'category',data:tickets.map(t=>t.ticketKey),axisLabel:{rotate:35}},yAxis:{type:'value',name:'Jours'},series:[{type:'bar',data:tickets.map(t=>t.timeSpentDays||0)}]});}
-function render(){const rows=getFiltered();document.getElementById('kpiEpics').textContent=String(rows.length);document.getElementById('kpiVersions').textContent=String(allVersions.length);document.getElementById('kpiSprints').textContent=String(allSprints.length);const tbody=document.getElementById('rows');tbody.innerHTML='';rows.forEach((r,idx)=>{const tr=document.createElement('tr');tr.innerHTML='<td><a href="#" data-idx="'+idx+'">'+r.epicKey+'</a></td><td>'+r.epicSummary+'</td><td>'+(r.versionNames||[]).join(', ')+'</td><td>'+Number(r.totalStoryPoints||0).toFixed(2)+'</td><td>'+Number(r.totalTimeSpentDays||0).toFixed(2)+'</td><td>'+(r.developers||[]).join(', ')+'</td>';tbody.appendChild(tr);});tbody.querySelectorAll('a[data-idx]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();selectedEpicIndex=Number(a.getAttribute('data-idx'));renderTicket(rows);}));chart.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{data:['Story Points','Temps (jours)']},xAxis:{type:'category',data:rows.map(r=>r.epicKey),axisLabel:{rotate:35}},yAxis:{type:'value'},series:[{name:'Story Points',type:'bar',data:rows.map(r=>Number(r.totalStoryPoints||0)),itemStyle:{color:'#1976d2'}},{name:'Temps (jours)',type:'bar',data:rows.map(r=>Number(r.totalTimeSpentDays||0)),itemStyle:{color:'#ef6c00'}}]});renderTicket(rows);}versionFilter.addEventListener('change',()=>{selectedVersions=Array.from(versionFilter.selectedOptions).map(o=>o.value);selectedEpicIndex=0;render();});sprintFilter.addEventListener('change',()=>{selectedSprints=Array.from(sprintFilter.selectedOptions).map(o=>o.value);selectedEpicIndex=0;render();});document.getElementById('resetBtn').addEventListener('click',()=>{selectedVersions=[];selectedSprints=[];Array.from(versionFilter.options).forEach(o=>o.selected=false);Array.from(sprintFilter.options).forEach(o=>o.selected=false);selectedEpicIndex=0;render();});render();</script></body></html>`;
+
+    const html = `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Epics · Vision autonome</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --bg: #060914;
+      --panel: rgba(12, 19, 38, 0.82);
+      --panel-soft: rgba(16, 26, 51, 0.68);
+      --text: #e9f1ff;
+      --muted: #9eb3d6;
+      --line: rgba(112, 149, 255, 0.24);
+      --primary: #67b7ff;
+      --secondary: #b388ff;
+      --accent: #38ffd3;
+      --danger: #ff7cb8;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 28px;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 500px at 8% -8%, rgba(56, 255, 211, 0.16), transparent 60%),
+        radial-gradient(900px 520px at 100% 0%, rgba(179, 136, 255, 0.2), transparent 60%),
+        linear-gradient(145deg, #060914, #0c1326 40%, #0a1022 100%);
+      font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      background: linear-gradient(90deg, #a3d2ff, #d6bcff 45%, #8cffea);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(19, 30, 57, 0.7);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .kpi {
+      background: linear-gradient(160deg, rgba(17, 27, 51, 0.9), rgba(10, 18, 37, 0.85));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: #f4f8ff;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    select {
+      width: 100%;
+      min-height: 112px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 8px;
+      outline: none;
+    }
+
+    option { padding: 4px 8px; }
+
+    button {
+      border: 1px solid rgba(127, 193, 255, 0.4);
+      background: linear-gradient(135deg, rgba(103, 183, 255, 0.2), rgba(179, 136, 255, 0.25));
+      color: #ebf4ff;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(103, 183, 255, 0.22);
+    }
+
+    #chart, #ticketChart {
+      width: 100%;
+      height: 450px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(9, 16, 32, 0.75);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 920px;
+      background: rgba(8, 14, 30, 0.85);
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(103, 146, 255, 0.14);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: rgba(18, 29, 57, 0.96);
+      color: #bed2f5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 11px;
+    }
+
+    td { color: #e7efff; }
+
+    tr:hover td { background: rgba(73, 120, 255, 0.08); }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .section-title {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #dcebff;
+    }
+
+    @media (max-width: 1000px) {
+      body { padding: 18px; }
+      .hero { flex-direction: column; }
+      .kpis { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+      .filters { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <h1 class="title">Epic Delivery Radar</h1>
+      <div class="subtitle">Projet ${this.projectKey} · Version autonome exportée</div>
+    </div>
+    <div class="pill" id="generatedAt">Génération: —</div>
+  </header>
+
+  <section class="kpis">
+    <article class="kpi"><div class="kpi-label">Epics visibles</div><div class="kpi-value" id="kpiEpics">0</div></article>
+    <article class="kpi"><div class="kpi-label">Versions disponibles</div><div class="kpi-value" id="kpiVersions">0</div></article>
+    <article class="kpi"><div class="kpi-label">Sprints disponibles</div><div class="kpi-value" id="kpiSprints">0</div></article>
+    <article class="kpi"><div class="kpi-label">Tickets enfants visibles</div><div class="kpi-value" id="kpiTickets">0</div></article>
+  </section>
+
+  <section class="panel filters">
+    <div>
+      <label for="versionFilter">Filtrer par versions</label>
+      <select id="versionFilter" multiple></select>
+    </div>
+    <div>
+      <label for="sprintFilter">Filtrer par sprints</label>
+      <select id="sprintFilter" multiple></select>
+    </div>
+    <div>
+      <button id="resetBtn">Réinitialiser les filtres</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="section-title">Vue macro des epics</h2>
+    <div id="chart"></div>
+  </section>
+
+  <section class="panel">
+    <h2 class="section-title">Synthèse des epics</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Epic</th>
+            <th>Résumé</th>
+            <th>Versions</th>
+            <th>Story Points</th>
+            <th>Temps (jours)</th>
+            <th>Vélocité</th>
+            <th>Développeurs</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="section-title" id="selectedEpicTitle">Détails tickets enfants</h2>
+    <div id="ticketChart"></div>
+    <div class="table-wrap" style="margin-top:12px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Résumé</th>
+            <th>Statut</th>
+            <th>Story Points</th>
+            <th>Temps (jours)</th>
+            <th>Développeurs</th>
+          </tr>
+        </thead>
+        <tbody id="ticketRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script>
+    const payload = ${JSON.stringify(payload)};
+    const data = payload.rows || [];
+    const generatedDate = new Date(payload.generatedAt);
+
+    const allVersions = [...new Set(data.flatMap(r => r.versionNames || []))].sort((a, b) => a.localeCompare(b));
+    const allSprints = [...new Set(data.flatMap(r => (r.sprintDeliveries || []).map(s => s.sprintName || '')))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+    const versionFilter = document.getElementById('versionFilter');
+    const sprintFilter = document.getElementById('sprintFilter');
+    const generatedAtEl = document.getElementById('generatedAt');
+    generatedAtEl.textContent = 'Génération: ' + (isNaN(generatedDate.getTime()) ? 'inconnue' : generatedDate.toLocaleString('fr-FR'));
+
+    let selectedVersions = [];
+    let selectedSprints = [];
+    let selectedEpicIndex = 0;
+
+    const escapeHtml = (value = '') => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+
+    allVersions.forEach(v => {
+      const option = document.createElement('option');
+      option.value = v;
+      option.textContent = v;
+      versionFilter.appendChild(option);
+    });
+
+    allSprints.forEach(s => {
+      const option = document.createElement('option');
+      option.value = s;
+      option.textContent = s;
+      sprintFilter.appendChild(option);
+    });
+
+    const chart = echarts.init(document.getElementById('chart'));
+    const ticketChart = echarts.init(document.getElementById('ticketChart'));
+
+    function filteredRows() {
+      return data.filter(row => {
+        const versionOk = selectedVersions.length === 0 || (row.versionNames || []).some(v => selectedVersions.includes(v));
+        const sprintNames = (row.sprintDeliveries || []).map(s => s.sprintName);
+        const sprintOk = selectedSprints.length === 0 || sprintNames.some(s => selectedSprints.includes(s));
+        return versionOk && sprintOk;
+      });
+    }
+
+    function renderTicketArea(rows) {
+      const epic = rows[selectedEpicIndex] || rows[0] || null;
+      const tickets = epic?.childTickets || [];
+
+      document.getElementById('selectedEpicTitle').textContent = epic
+        ? 'Détails tickets enfants · ' + epic.epicKey
+        : 'Détails tickets enfants';
+
+      document.getElementById('kpiTickets').textContent = String(tickets.length);
+
+      const ticketRows = document.getElementById('ticketRows');
+      ticketRows.innerHTML = '';
+
+      tickets.forEach(ticket => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = ''
+          + '<td><a href="' + escapeHtml(ticket.ticketUrl || '#') + '" target="_blank" rel="noopener">' + escapeHtml(ticket.ticketKey || '') + '</a></td>'
+          + '<td>' + escapeHtml(ticket.summary || '') + '</td>'
+          + '<td>' + escapeHtml(ticket.status || 'Inconnu') + '</td>'
+          + '<td>' + Number(ticket.storyPoints || 0).toFixed(2) + '</td>'
+          + '<td>' + Number(ticket.timeSpentDays || 0).toFixed(2) + '</td>'
+          + '<td>' + escapeHtml((ticket.developers || []).join(', ')) + '</td>';
+        ticketRows.appendChild(tr);
+      });
+
+      ticketChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: 40, right: 20, top: 30, bottom: 60 },
+        xAxis: {
+          type: 'category',
+          data: tickets.map(t => t.ticketKey),
+          axisLabel: { rotate: 28, color: '#bdd2ff' },
+          axisLine: { lineStyle: { color: 'rgba(111, 153, 255, 0.4)' } }
+        },
+        yAxis: {
+          type: 'value',
+          name: 'Jours',
+          nameTextStyle: { color: '#bdd2ff' },
+          axisLabel: { color: '#bdd2ff' },
+          splitLine: { lineStyle: { color: 'rgba(111, 153, 255, 0.15)' } }
+        },
+        series: [{
+          type: 'bar',
+          data: tickets.map(t => Number(t.timeSpentDays || 0)),
+          barMaxWidth: 34,
+          itemStyle: { color: '#7fd0ff', shadowBlur: 10, shadowColor: 'rgba(127, 208, 255, 0.35)' }
+        }]
+      });
+    }
+
+    function render() {
+      const rows = filteredRows();
+      document.getElementById('kpiEpics').textContent = String(rows.length);
+      document.getElementById('kpiVersions').textContent = String(allVersions.length);
+      document.getElementById('kpiSprints').textContent = String(allSprints.length);
+
+      if (selectedEpicIndex >= rows.length) {
+        selectedEpicIndex = 0;
+      }
+
+      const tbody = document.getElementById('rows');
+      tbody.innerHTML = '';
+
+      rows.forEach((row, idx) => {
+        const velocity = Number(row.epicVelocity || 0).toFixed(2);
+        const tr = document.createElement('tr');
+        tr.innerHTML = ''
+          + '<td><a href="#" data-idx="' + idx + '">' + escapeHtml(row.epicKey || '') + '</a></td>'
+          + '<td>' + escapeHtml(row.epicSummary || '') + '</td>'
+          + '<td>' + escapeHtml((row.versionNames || []).join(', ') || 'Sans version') + '</td>'
+          + '<td>' + Number(row.totalStoryPoints || 0).toFixed(2) + '</td>'
+          + '<td>' + Number(row.totalTimeSpentDays || 0).toFixed(2) + '</td>'
+          + '<td>' + velocity + '</td>'
+          + '<td>' + escapeHtml((row.developers || []).join(', ')) + '</td>';
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('a[data-idx]').forEach(a => {
+        a.addEventListener('click', event => {
+          event.preventDefault();
+          selectedEpicIndex = Number(a.getAttribute('data-idx'));
+          renderTicketArea(rows);
+        });
+      });
+
+      chart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: {
+          data: ['Story Points', 'Temps (jours)'],
+          top: 0,
+          textStyle: { color: '#d7e7ff' }
+        },
+        grid: { left: 40, right: 20, top: 46, bottom: 64 },
+        xAxis: {
+          type: 'category',
+          data: rows.map(r => r.epicKey),
+          axisLabel: { rotate: 28, color: '#c3d8ff' },
+          axisLine: { lineStyle: { color: 'rgba(111, 153, 255, 0.4)' } }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { color: '#c3d8ff' },
+          splitLine: { lineStyle: { color: 'rgba(111, 153, 255, 0.15)' } }
+        },
+        series: [
+          {
+            name: 'Story Points',
+            type: 'bar',
+            barMaxWidth: 34,
+            data: rows.map(r => Number(r.totalStoryPoints || 0)),
+            itemStyle: { color: '#74bbff', borderRadius: [6, 6, 0, 0] }
+          },
+          {
+            name: 'Temps (jours)',
+            type: 'bar',
+            barMaxWidth: 34,
+            data: rows.map(r => Number(r.totalTimeSpentDays || 0)),
+            itemStyle: { color: '#c792ff', borderRadius: [6, 6, 0, 0] }
+          }
+        ]
+      });
+
+      renderTicketArea(rows);
+    }
+
+    versionFilter.addEventListener('change', () => {
+      selectedVersions = Array.from(versionFilter.selectedOptions).map(option => option.value);
+      selectedEpicIndex = 0;
+      render();
+    });
+
+    sprintFilter.addEventListener('change', () => {
+      selectedSprints = Array.from(sprintFilter.selectedOptions).map(option => option.value);
+      selectedEpicIndex = 0;
+      render();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      selectedVersions = [];
+      selectedSprints = [];
+      Array.from(versionFilter.options).forEach(option => option.selected = false);
+      Array.from(sprintFilter.options).forEach(option => option.selected = false);
+      selectedEpicIndex = 0;
+      render();
+    });
+
+    window.addEventListener('resize', () => {
+      chart.resize();
+      ticketChart.resize();
+    });
+
+    render();
+  </script>
+</body>
+</html>`;
 
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
