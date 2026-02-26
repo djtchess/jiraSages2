@@ -1,52 +1,484 @@
+/* ===CONTENEUR GLOBAL CALENDRIER === */
 .calendar-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-soft);
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f9fbfc;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+  max-width: 100vw;
+  overflow-x: auto;
 }
 
+/* === EN-TETE MOIS === */
 .calendar-header {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: #222;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgb(0 143 255 / 0.4);
+  user-select: none;
+  text-align: center;
 }
 
+/* === SELECTEUR DE MOIS === */
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.month-selector mat-form-field {
+  min-width: 220px;
+  --mat-form-field-underline-color: #4facfe;
+  --mat-form-field-label-color: #0077cc;
+}
+
+/* === TABLE PRINCIPALE === */
 .calendarTable {
+  /* border-collapse: separate;
+  border-spacing: 0 4px; 
+  margin: auto; */
   border-collapse: collapse;
+  background-color: white;
   min-width: 800px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.05);
+  user-select: none;
 }
 
+/* Cellules et en-têtes */
 .calendarTable th,
 .calendarTable td {
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: 0.75rem;
+  padding: 0.9rem 1rem;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.85rem;
+  color: #3a3a3a;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* === DATES === */
 .calendarTable td.date {
-  background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface));
-  color: var(--color-primary-strong);
-  font-weight: 700;
+  background: linear-gradient(145deg, #d0e7ff, #a0cdfd);
+  font-weight: 600;
+  color: #014a9c;
+  position: relative;
+  cursor: default;
 }
 
+.calendarTable td.date::before {
+  content: attr(data-day);
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-style: italic;
+  color: #0560d8;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.calendarTable td.date.today {
+  background: #2196f3;
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 0 12px #2196f3aa;
+  border-radius: 10px;
+}
+
+/* Week-end - ultra clair et pastel */
+.calendarTable .weekend {
+  background: linear-gradient(145deg, #e0eaf6, #d1e3f5); /* un peu plus soutenu */
+  color: #4a6a85;
+  font-style: normal;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: inset 0 0 4px rgba(163, 184, 211, 0.1);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  cursor: default;
+  user-select: none;
+}
+
+
+
+
+/* === RESSOURCES === */
 .calendarTable td.resource {
-  background: var(--color-surface-soft);
-  color: var(--color-text);
+  background: #eff7ff;
+  color: #0451a5;
   font-weight: 700;
+  padding-left: 1.2rem;
+  border-radius: 12px;
+  box-shadow: inset 2px 2px 5px #c5defe;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: default;
+  user-select: none;
+  font-size: 0.9rem;
+  transition: background-color 0.3s ease;
 }
 
+.calendarTable tr:hover td.resource {
+  background: #d6eaff;
+  box-shadow: inset 3px 3px 8px #a3c2fa;
+}
+
+/* Avatar rond */
+.calendarTable td.resource .avatar {
+  background: linear-gradient(135deg, #2196f3, #64b5f6);
+  box-shadow: 0 2px 6px rgb(33 150 243 / 0.5);
+  color: white;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* === CELLULES EVENEMENTS === */
 .calendarTable td.event-cell {
-  background: linear-gradient(120deg, var(--color-primary), var(--color-accent));
-  color: #fff;
+  background: linear-gradient(90deg, #3a8dff, #1860d2);
+  color: white;
   font-weight: 700;
+  border-radius: 10px;
+  box-shadow: 0 0 8px #3a8dffaa;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.calendarTable td.weekend {
-  background: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+.calendarTable td.event-cell:hover {
+  background: linear-gradient(90deg, #2765cc, #134a8a);
+  box-shadow: 0 0 14px #1a4aa3cc;
 }
+
+/* Week-end events */
+.calendarTable td.event-cell.weekend {
+  background: linear-gradient(90deg, #a1aec2, #7486a1);
+  box-shadow: none;
+  color: #1e99a1;
+  cursor: default;
+}
+
+/* Hover léger sur autres cellules */
+.calendarTable td:hover:not(.event-cell):not(.resource):not(.date):not(.weekend) {
+  background-color: #f5f9fc;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+/* === SURBRILLANCES === */
+.calendarTable td.highlight-cell {
+  background-color: rgba(255, 214, 77, 0.3);
+  border-radius: 10px;
+  box-shadow: inset 0 0 10px #f4c400aa;
+}
+
+.calendarTable td.resource.highlight-row {
+  background-color: rgba(255, 224, 130, 0.35);
+  color: #594b00;
+}
+
+.calendarTable td.date.highlight-cell {
+  background-color: rgba(46, 204, 113, 0.35);
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+/* Cellule sélectionnée animée */
+.calendarTable td.selected-cell {
+  animation: pulse-highlight 1.5s infinite alternate;
+  background-color: rgba(33, 150, 243, 0.35);
+  border-radius: 10px;
+}
+
+/* Arrondi uniquement pour le premier jour du mois */
+.calendarTable td.date.first-day {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+/* Arrondi uniquement pour le dernier jour du mois */
+.calendarTable td.date.last-day {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Animation pulse douce */
+@keyframes pulse-highlight {
+  0% {
+    box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(33, 150, 243, 0.9);
+  }
+}
+
+/* Focus clavier */
+.calendarTable td:focus-visible {
+  outline: 2px solid #1e88e5;
+  outline-offset: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+/* === TABLEAU EVENEMENTS INTERNE === */
+#eventTable {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  border: none;
+  table-layout: fixed;
+}
+
+#eventTable, #eventTable tr, #eventTable td {
+  border: none !important;
+}
+
+#eventTable td.event {
+  background-color: #ef5350;
+  color: white;
+  font-weight: 700;
+  padding: 0;
+  border-radius: 6px;
+}
+
+
+/* === BOUTONS PERSONNALISÉS === */
+.custom-button {
+  color: white;
+  background: #d32f2f;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+
+.custom-button:hover {
+  background-color: #b71c1c;
+}
+
+/* === DIALOG MODAL === */
+.custom-dialog .mat-dialog-container {
+  width: 80%;
+  height: 80%;
+  max-width: 90vw;
+  max-height: 80vh;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.2);
+}
+
+/* === LÉGENDE === */
+.calendar-legend {
+  display: flex;
+  gap: 2rem;
+  margin: 1.5rem auto;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-wrap: wrap;
+  user-select: none;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.legend-color {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
+
+.legend-color.event {
+  background: linear-gradient(90deg, #3a8dff, #1860d2);
+}
+
+.legend-color.event-cell {
+  background: linear-gradient(90deg, #2196f3, #64b5f6);
+}
+
+.legend-color.weekend {
+  background: #e0e7ef;
+  box-shadow: none;
+}
+
+.legend-color.highlight-cell {
+  background: rgba(255, 214, 77, 0.4);
+  box-shadow: none;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 900px) {
+  .calendarTable {
+    min-width: 100%;
+  }
+  .month-selector {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .calendar-legend {
+    justify-content: space-around;
+  }
+}
+
+.presence-counter {
+  font-size: 0.8em;
+  color: #555;
+  margin-left: 4px;
+}
+
+.month-page {
+  page-break-before: always;
+  break-before: page;
+}
+
+/* Réduit la taille du tableau pour le PDF */
+.pdf-scale {
+  transform: scale(0.6);
+  transform-origin: top left;
+  width: 166.66%; /* 100% / 0.6 pour compenser le scale */
+}
+/* Empêche la coupure d’éléments importants */
+tr, td {
+  page-break-inside: avoid;
+}
+
+.page-break {
+  page-break-before: always;
+  break-before: page;
+}
+ 
+
+
+
+
+
+
+
+
+
+/* Conteneur principal pour le PDF */
+.pdf-export {
+  background: white;
+  color: #000;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 10px;
+  border-radius: 0; /* Aucune bordure arrondie */
+}
+
+/* Titres */
+.pdf-export h1,
+.pdf-export h2,
+.pdf-export h3 {
+  text-align: center;
+  font-weight: bold;
+  margin: 10px 0;
+  border-radius: 0;
+}
+
+/* Tableau */
+.pdf-export table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  border-radius: 0;
+}
+
+/* En-têtes */
+.pdf-export th {
+  background-color: #eaeaea;
+  color: #000;
+  padding: 8px;
+  text-align: center;
+  border: 1px solid #bbb;
+  border-radius: 0;
+}
+
+/* Cellules */
+.pdf-export td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+  border-radius: 0;
+}
+
+/* Événements */
+.pdf-export .event-conge {
+  background-color: #ffd6d6;
+  border-radius: 0;
+}
+
+.pdf-export .event-teletravail {
+  background-color: #d6e9ff;
+  border-radius: 0;
+}
+
+.pdf-export .event-journalier {
+  background-color: #daf7dc;
+  border-radius: 0;
+}
+
+/* Fusion de cellules */
+.pdf-export td[colspan] {
+  font-weight: bold;
+  background-color: #f3f3f3;
+  border-radius: 0;
+}
+
+/* Weekends et jours fériés */
+.pdf-export .weekend {
+  background-color: #f9f9f9;
+  color: #888;
+  border-radius: 0;
+}
+
+.pdf-export .holiday {
+  background-color: #fff1d6;
+  border-radius: 0;
+}
+
+/* Supprime les ombres, transitions et coins arrondis globaux */
+.pdf-export * {
+  box-shadow: none !important;
+  transition: none !important;
+  border-radius: 0 !important;
+}
+
+.pdf-export th,
+.pdf-export td {
+  padding-top: 3px;   /* au lieu de 6px ou 8px */
+  padding-bottom: 3px;
+  height: 20px;       /* fixe la hauteur à 20px par exemple */
+  line-height: 1.1;   /* un peu plus compact */
+}
+
+.pdf-export .avatar {
+  display: none !important;
+}
+
