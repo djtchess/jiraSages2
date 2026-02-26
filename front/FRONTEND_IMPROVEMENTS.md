@@ -1,136 +1,154 @@
-# Analyse du front Angular et propositions d'amélioration
+# Audit expert Angular (front) — robustesse & maintenabilité
 
-## Synthèse rapide
-
-Le front repose déjà sur Angular 18 avec composants standalone et Angular Material, ce qui est une bonne base. Les axes d'amélioration prioritaires concernent surtout:
-
-1. **la maintenabilité** (composants trop volumineux et logique métier mélangée au rendu),
-2. **la robustesse RxJS** (abonnements non sécurisés, risques de fuite mémoire),
-3. **l'UX/navigation** (route d'accueil absente, accessibilité perfectible),
-4. **l'outillage qualité** (linting, tests unitaires ciblés, vérifications de build en CI).
+## Objectif
+Structurer un plan d’action concret pour rendre le front plus **robuste**, **maintenable** et **prévisible** en production.
 
 ---
 
-## 1) Architecture & organisation
+## 1) Priorité P0 (à corriger immédiatement)
 
-### 1.1 Découper les composants "god objects"
-- `CalendarComponent` concentre énormément de responsabilités: initialisation, cache, calcul de présence, interactions cellule, suppression/création d'événements, export PDF.
-- Recommandation: extraire en services/facades dédiés:
-  - `CalendarFacadeService` (chargement + orchestration),
-  - `CalendarCacheService` (span/presence cache),
-  - `CalendarExportService` (PDF/images),
-  - `CalendarDialogsService` (ouverture/fermeture des dialogs).
+### P0.1 — Corriger l’accumulation de jours fériés (bug fonctionnel)
+**Constat**
+- `HolidayService.getHolidays()` appelle `calculateHolidays()` qui pousse (`push`) dans un tableau partagé `this.holidays` sans reset.
+- Résultat: appels successifs = doublons croissants et calculs de planning faussés.
 
-**Bénéfice**: code plus testable, plus lisible, et réduction des effets de bord.
+**Actions**
+1. Rendre `calculateHolidays(year)` pure: retourner un nouveau tableau plutôt que muter un état global.
+2. Mettre en place un cache par année (`Map<number, Holiday[]>`) immuable.
+3. Ajouter tests unitaires: 2 appels consécutifs sur la même année ne doivent pas augmenter la taille.
 
-### 1.2 Uniformiser les conventions
-- Mélange de styles d'injection (`constructor`, `inject()`), noms de fichiers (`HolidayService.ts` en PascalCase côté fichier), et imports redondants.
-- Recommandation: standardiser:
-  - noms de fichiers en `kebab-case`,
-  - un style d'injection unique par équipe,
-  - suppression des imports inutilisés.
+**Impact**
+- Fiabilité fonctionnelle du calendrier.
+- Élimination d’un bug silencieux difficile à diagnostiquer.
 
-**Bénéfice**: onboarding plus rapide et dette technique réduite.
+### P0.2 — Ajouter une vraie route racine + wildcard
+**Constat**
+- La route `''` est commentée et aucune route `**` n’existe.
+- Le menu propose pourtant un lien vers `/`.
 
----
+**Actions**
+1. Réactiver la route d’accueil (`HomeComponent` ou redirection explicite).
+2. Ajouter `path: '**'` vers une page 404 standalone.
+3. Couvrir par tests de routing (URL invalide => 404/redirection).
 
-## 2) Données & RxJS
+**Impact**
+- Navigation robuste.
+- Meilleure UX au premier chargement et sur URL profondes.
 
-### 2.1 Sécuriser les subscriptions
-- Exemple observé: abonnement dans `SprintListComponent` sans pattern de destruction explicite.
-- Recommandation Angular 16+:
-  - utiliser `takeUntilDestroyed()` + `DestroyRef`,
-  - ou convertir en `signal`/`toSignal()` lorsque pertinent.
+### P0.3 — Supprimer les abonnements "non bornés" dans les composants
+**Constat**
+- `AppComponent` s’abonne à `activeTheme$` sans stratégie de teardown.
+- `SprintListComponent` s’abonne directement aux sprints sans gestion de cycle de vie.
 
-**Bénéfice**: pas de fuite mémoire lors des navigations répétées.
+**Actions**
+1. Standardiser avec `takeUntilDestroyed(inject(DestroyRef))`.
+2. Alternative recommandée Angular 17/18: convertir en `signal` via `toSignal()` quand pertinent.
+3. Ajouter règle d’équipe: pas de `subscribe()` en composant sans stratégie de destruction.
 
-### 2.2 Réduire les `any` et renforcer le typage
-- Dans `CalendarComponent`, des accès `(ev as any).idEvent` apparaissent.
-- Recommandation:
-  - définir un contrat `EventModel` strict,
-  - normaliser l'objet dès la couche service (adapter DTO -> modèle applicatif).
-
-**Bénéfice**: erreurs captées à la compilation, moins de bugs runtime.
-
-### 2.3 Limiter la logique de normalisation dans les composants
-- La correction de nom (`Assih Jean-Samuel` -> `Jean-Samuel`) est faite côté composant.
-- Recommandation: déplacer cette logique dans un mapper de service.
-
-**Bénéfice**: séparation claire entre rendu et transformation de données.
+**Impact**
+- Réduction des fuites mémoire et effets de bord après navigation.
 
 ---
 
-## 3) Routing, UX & accessibilité
+## 2) Priorité P1 (refactoring structurant)
 
-### 3.1 Ajouter une route d'accueil et une route wildcard
-- La route racine est commentée et il n'y a pas de fallback `**`.
-- Recommandation:
-  - restaurer `path: ''` vers `HomeComponent`,
-  - ajouter `path: '**'` vers une page 404 ou redirection.
+### P1.1 — Réduire la complexité de `CalendarComponent`
+**Constat**
+- Le composant concentre: chargement data, normalisation, cache, logique métier, CRUD événements, export PDF, interactions UI.
 
-**Bénéfice**: meilleure résilience de navigation et expérience utilisateur.
+**Actions**
+1. Créer une façade (`CalendarFacadeService`) pour orchestrer chargement + mutations.
+2. Extraire le cache (`CalendarCacheService`) et la logique d’export (`CalendarExportService`).
+3. Limiter le composant à l’état d’affichage + handlers UI.
 
-### 3.2 Supprimer les styles inline
-- Plusieurs blocs HTML utilisent des `style="..."` directement.
-- Recommandation: déplacer dans les `.css/.scss` composants et créer des classes utilitaires.
+**Impact**
+- Forte amélioration testabilité/évolutivité.
+- Diminution du risque de régression lors des changements métier.
 
-**Bénéfice**: cohérence visuelle, surcharge HTML réduite, meilleur theming.
+### P1.2 — Éliminer les `any` et normaliser les DTO
+**Constat**
+- Le calendrier utilise `(ev as any).idEvent` / `(ev as any).id`.
 
-### 3.3 Améliorer l'accessibilité Material
-- Recommandation:
-  - ajouter des `aria-label` explicites sur boutons icône,
-  - vérifier le contraste mode sombre,
-  - ajouter des états focus visibles.
+**Actions**
+1. Définir un contrat frontend unique (`CalendarEvent` avec id obligatoire).
+2. Ajouter un mapper HTTP côté service pour convertir DTO backend -> modèle strict.
+3. Interdire l’usage de `any` dans ce flux critique.
 
-**Bénéfice**: conformité a11y et meilleure ergonomie clavier/lecteur d'écran.
+**Impact**
+- Erreurs détectées à la compilation.
+- Contrats API plus stables et explicites.
 
----
+### P1.3 — Centraliser la configuration API
+**Constat**
+- `JiraService` et `SprintService` hardcodent `http://localhost:8088/api`.
 
-## 4) Performance
+**Actions**
+1. Basculer vers `environment.ts` / `environment.prod.ts`.
+2. Utiliser un token d’injection (`API_BASE_URL`) partagé.
+3. Ajouter un `HttpInterceptor` pour erreurs globales et éventuellement auth.
 
-### 4.1 Généraliser `trackBy` dans les listes répétées
-- Pour les `*ngFor` volumineux (calendrier/ressources), définir des fonctions `trackBy` stables.
-
-### 4.2 Migrer progressivement vers Signals
-- Pour les états UI locaux (mois courant, filtres, toggles), les signals réduisent le boilerplate RxJS.
-
-### 4.3 Précharger/lazy-load les pages coûteuses
-- Les vues lourdes (calendrier, burnup) bénéficieraient d'un lazy loading systématique.
-
-**Bénéfice global**: moins de rerenders et meilleure réactivité perçue.
-
----
-
-## 5) Qualité & outillage
-
-### 5.1 Ajouter lint + format en scripts npm
-- Le `package.json` n'expose que `start/build/watch/test`.
-- Recommandation:
-  - ajouter `lint` (ESLint Angular),
-  - ajouter `format` (Prettier),
-  - intégrer ces checks en CI.
-
-### 5.2 Renforcer les tests unitaires ciblés
-Priorités de tests:
-- fonctions de calcul du calendrier (jours ouvrés, demi-journées, congés),
-- navigation/routing (`openCapacityView`, routes invalides),
-- composants UI critiques (tableau sprint + interactions).
-
-### 5.3 Ajouter des garde-fous TypeScript stricts
-- Activer/renforcer progressivement:
-  - `strict`,
-  - `noImplicitOverride`,
-  - `noUncheckedIndexedAccess`.
-
-**Bénéfice**: meilleure fiabilité long terme.
+**Impact**
+- Déploiement multi-environnements sécurisé.
+- Réduction des erreurs de configuration.
 
 ---
 
-## Plan d'action recommandé (ordre)
+## 3) Priorité P2 (qualité technique et DX)
 
-1. **Semaine 1**: routing racine/wildcard + suppression styles inline les plus visibles + `aria-label`.
-2. **Semaine 2**: sécurisation RxJS (`takeUntilDestroyed`) et nettoyage `any` critiques.
-3. **Semaine 3**: extraction de la logique métier du calendrier dans une facade/service.
-4. **Semaine 4**: lint/format/CI + lot de tests unitaires sur fonctions pures.
+### P2.1 — Nettoyer l’initialisation Angular
+**Constat**
+- `provideHttpClient()` et animations sont déclarés plusieurs fois (`main.ts` + `app.config.ts`).
 
-Ce plan permet d'obtenir rapidement des gains UX/qualité tout en préparant une refonte technique progressive sans rupture.
+**Actions**
+1. Définir une source unique de providers (recommandé: `app.config.ts`).
+2. Garder `bootstrapApplication(AppComponent, appConfig)` sans duplication.
+3. Vérifier startup via test smoke.
+
+### P2.2 — Conventions et cohérence projet
+**Constat**
+- Nommage de fichier atypique (`HolidayService.ts`), mélange des styles DI, code commenté conservé dans des fichiers cœur.
+
+**Actions**
+1. Uniformiser naming (`kebab-case` fichiers).
+2. Définir conventions DI (constructor ou `inject`) et les appliquer.
+3. Supprimer le code mort/commenté de production.
+
+### P2.3 — Outillage qualité
+**Constat**
+- Scripts NPM limités (`start`, `build`, `test`), pas de `lint`/`format`.
+
+**Actions**
+1. Ajouter ESLint Angular + Prettier.
+2. Ajouter scripts `lint`, `format`, `format:check`.
+3. Exécuter `lint + test + build` en CI à chaque PR.
+
+---
+
+## 4) Plan d’exécution recommandé (4 semaines)
+
+### Semaine 1 — Stabilisation production (P0)
+- Fix `HolidayService` + tests.
+- Routing racine + wildcard + test routing.
+- Sécurisation subscriptions (`AppComponent`, `SprintListComponent`).
+
+### Semaine 2 — Contrats et couche data (P1)
+- Modèle `CalendarEvent` strict.
+- Mapper DTO dans services.
+- Externalisation `API_BASE_URL` + environnements.
+
+### Semaine 3 — Refactoring calendrier (P1)
+- Extraction façade/cache/export.
+- Simplification du composant et des handlers.
+
+### Semaine 4 — Qualité et industrialisation (P2)
+- ESLint/Prettier.
+- Pipeline CI qualité.
+- Nettoyage conventions + dette technique restante.
+
+---
+
+## 5) KPI de succès
+- 0 fuite mémoire détectée sur navigation répétée.
+- 0 duplication des jours fériés sur multi-chargements.
+- Couverture unitaire des services critiques (holiday/calendar/routing).
+- Pipeline CI vert avec `lint + test + build`.

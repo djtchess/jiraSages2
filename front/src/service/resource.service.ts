@@ -1,44 +1,32 @@
-import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { Resource, Event } from '../model/Resource';
+import { API_BASE_URL } from '../app/core/api.tokens';
+import { Resource } from '../model/Resource';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ResourceService {
+  private readonly resources = signal<Resource[]>([]);
+  private readonly urlDevelopper: string;
 
-  private http = inject(HttpClient);
-  private resources = signal<Resource[]>([])
-  readonly urlDevelopper = 'http://localhost:8088/api/developpers';
-
-  constructor() { 
-    console.log("constructor ResourceService appelé");
+  constructor(
+    private readonly http: HttpClient,
+    @Inject(API_BASE_URL) apiBaseUrl: string
+  ) {
+    this.urlDevelopper = `${apiBaseUrl}/developpers`;
   }
 
   getResources(): Observable<Resource[]> {
-    return this.http.get<Resource[]>(this.urlDevelopper).pipe(
-      tap(resources => this.resources.set(resources))
-    );
+    return this.http.get<Resource[]>(this.urlDevelopper).pipe(tap((resources) => this.resources.set(resources)));
   }
 
   saveResource(resource: Resource): Observable<Resource> {
     return this.http.post<Resource>(this.urlDevelopper, resource).pipe(
-      tap(savedResource => {
-        this.resources.update(res => [...res, savedResource]);
+      tap((savedResource) => {
+        this.resources.update((res) => [...res, savedResource]);
       })
     );
   }
-
-
-  // saveEvent(event: any): Observable<Event> {
-  //   console.log("post EventService by resource appelé ");
-  //   console.log("event.dateDebutEvent :  "+event.dateDebutEvent);
-  //   return this.http.post<Event>(this.urlDevelopper+'/create', event).pipe(
-  //     tap(savedEvent => {
-  //       console.log("post saved ok appelé "+savedEvent.dateDebutEvent);
-  //     })
-  //   );
-  // }
-  
 }
