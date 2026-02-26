@@ -11,10 +11,20 @@
   background: transparent;
 }
 
-.action-buttons {
+.action-buttons-cell {
+  vertical-align: middle;
+}
+
+.action-buttons-content {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.action-buttons-content .mat-mdc-button-base {
+  min-height: 36px;
+  line-height: 1;
 }
 
 h4 {

@@ -28,13 +28,15 @@
 
     <ng-container matColumnDef="action">
       <th mat-header-cell *matHeaderCellDef>Actions</th>
-      <td mat-cell *matCellDef="let sprint" class="action-buttons">
-        <button mat-raised-button color="primary" (click)="openBurnUp(sprint)">
-          <mat-icon>visibility</mat-icon> voir
-        </button>
-        <button mat-stroked-button color="primary" (click)="openCapacityView(6, sprint.id)">
-          <mat-icon>visibility</mat-icon> Capacité dev
-        </button>
+      <td mat-cell *matCellDef="let sprint" class="action-buttons-cell">
+        <div class="action-buttons-content">
+          <button mat-raised-button color="primary" (click)="openBurnUp(sprint)">
+            <mat-icon>visibility</mat-icon> voir
+          </button>
+          <button mat-stroked-button color="primary" (click)="openCapacityView(6, sprint.id)">
+            <mat-icon>visibility</mat-icon> Capacité dev
+          </button>
+        </div>
       </td>
     </ng-container>
 
