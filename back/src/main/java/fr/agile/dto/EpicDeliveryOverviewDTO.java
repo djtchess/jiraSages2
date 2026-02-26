@@ -7,6 +7,11 @@ public record EpicDeliveryOverviewDTO(
         String epicSummary,
         String status,
         List<String> versionNames,
-        List<EpicSprintDTO> sprintDeliveries
+        List<EpicSprintDTO> sprintDeliveries,
+        List<String> developers,
+        double totalStoryPoints,
+        double totalTimeSpentDays,
+        double epicVelocity,
+        List<EpicChildTicketDTO> childTickets
 ) {
 }

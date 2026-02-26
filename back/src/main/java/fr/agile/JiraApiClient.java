@@ -38,6 +38,7 @@ import fr.agile.dto.AvancementHistorique;
 import fr.agile.dto.BoardInfo;
 import fr.agile.dto.BurnupDataDTO;
 import fr.agile.dto.BurnupPointDTO;
+import fr.agile.dto.EpicChildTicketDTO;
 import fr.agile.dto.EpicDeliveryOverviewDTO;
 import fr.agile.dto.EpicDurationEntryDTO;
 import fr.agile.dto.EpicSprintDTO;
@@ -533,11 +534,22 @@ public class JiraApiClient {
             String epicSummary = fields.path("summary").asText("Sans résumé");
             String status = fields.path("status").path("name").asText("Inconnu");
 
-            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("customfield_10020", "fixVersions"));
+            List<JsonNode> childIssues = getChildIssuesForEpic(projectKey, epicKey, List.of("key", "summary", "status", "assignee", "customfield_10020", "fixVersions", "customfield_10028"));
 
             Set<String> versionSet = new TreeSet<>();
+            Set<String> developersSet = new TreeSet<>();
+            List<EpicChildTicketDTO> childTickets = new ArrayList<>();
+            double totalStoryPoints = 0.0;
+            double totalTimeSpentDays = 0.0;
+
             for (JsonNode childIssue : childIssues) {
-                JsonNode fixVersions = childIssue.path("fields").path("fixVersions");
+                JsonNode fieldsChild = childIssue.path("fields");
+                String childKey = childIssue.path("key").asText();
+                String childSummary = fieldsChild.path("summary").asText("Sans résumé");
+                String childStatus = fieldsChild.path("status").path("name").asText("Inconnu");
+                String childAssignee = extractDisplayName(fieldsChild.path("assignee"));
+
+                JsonNode fixVersions = fieldsChild.path("fixVersions");
                 if (fixVersions.isArray()) {
                     for (JsonNode versionNode : fixVersions) {
                         String name = versionNode.path("name").asText(null);
@@ -546,6 +558,26 @@ public class JiraApiClient {
                         }
                     }
                 }
+
+                Double storyPointsRaw = BurnupUtils.parseDouble(fieldsChild.path("customfield_10028").asText(null));
+                double storyPoints = storyPointsRaw != null ? storyPointsRaw : 0.0;
+
+                WorklogSummary ws = getWorklogSummary(childKey);
+                List<String> ticketDevelopers = mergeDevelopers(ws.developers(), childAssignee);
+                developersSet.addAll(ticketDevelopers);
+                double timeSpentDays = BurnupUtils.roundToTwoDecimals(ws.totalSeconds() / 28800.0);
+                totalStoryPoints += storyPoints;
+                totalTimeSpentDays += timeSpentDays;
+
+                childTickets.add(new EpicChildTicketDTO(
+                        childKey,
+                        JIRA_URL + "/browse/" + childKey,
+                        childSummary,
+                        childStatus,
+                        BurnupUtils.roundToTwoDecimals(storyPoints),
+                        timeSpentDays,
+                        ticketDevelopers
+                ));
             }
             List<String> versions = versionSet.isEmpty() ? List.of("Sans version") : new ArrayList<>(versionSet);
 
@@ -563,7 +595,24 @@ public class JiraApiClient {
                     .toList();
 
             if (!deliveries.isEmpty()) {
-                result.add(new EpicDeliveryOverviewDTO(epicKey, epicSummary, status, versions, deliveries));
+                totalStoryPoints = BurnupUtils.roundToTwoDecimals(totalStoryPoints);
+                totalTimeSpentDays = BurnupUtils.roundToTwoDecimals(totalTimeSpentDays);
+                double epicVelocity = totalTimeSpentDays > 0.0
+                        ? BurnupUtils.roundToTwoDecimals(totalStoryPoints / totalTimeSpentDays)
+                        : 0.0;
+
+                result.add(new EpicDeliveryOverviewDTO(
+                        epicKey,
+                        epicSummary,
+                        status,
+                        versions,
+                        deliveries,
+                        new ArrayList<>(developersSet),
+                        totalStoryPoints,
+                        totalTimeSpentDays,
+                        epicVelocity,
+                        childTickets
+                ));
             }
         }
 
@@ -661,6 +710,46 @@ public class JiraApiClient {
         }
     }
 
+    private String extractDisplayName(JsonNode userNode) {
+        if (userNode == null || userNode.isMissingNode() || userNode.isNull()) {
+            return null;
+        }
+
+        String displayName = userNode.path("displayName").asText(null);
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+
+        String name = userNode.path("name").asText(null);
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+
+        String accountId = userNode.path("accountId").asText(null);
+        if (accountId != null && !accountId.isBlank()) {
+            return accountId;
+        }
+
+        return null;
+    }
+
+    private List<String> mergeDevelopers(List<String> worklogDevelopers, String assignee) {
+        Set<String> merged = new TreeSet<>();
+        if (worklogDevelopers != null) {
+            merged.addAll(worklogDevelopers.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .toList());
+        }
+
+        if (assignee != null && !assignee.isBlank()) {
+            merged.add(assignee.trim());
+        }
+
+        return new ArrayList<>(merged);
+    }
+
     private Set<Long> extractSprintIdsFromIssues(List<JsonNode> childIssues) {
         Set<Long> sprintIds = new TreeSet<>();
         for (JsonNode childIssue : childIssues) {
@@ -676,6 +765,35 @@ public class JiraApiClient {
         }
         return sprintIds;
     }
+
+    private WorklogSummary getWorklogSummary(String issueKey) throws Exception {
+        int startAt = 0;
+        int maxResults = 100;
+        int total = Integer.MAX_VALUE;
+        long totalSeconds = 0L;
+        Set<String> developers = new TreeSet<>();
+
+        while (startAt < total) {
+            String url = JIRA_URL + "/rest/api/3/issue/" + issueKey + "/worklog?startAt=" + startAt + "&maxResults=" + maxResults;
+            HttpRequest request = jiraHttpClient.createRequest(url);
+            String body = jiraHttpClient.sendRequest(request);
+            JsonNode root = MAPPER.readTree(body);
+
+            total = root.path("total").asInt(0);
+            for (JsonNode worklog : root.path("worklogs")) {
+                totalSeconds += worklog.path("timeSpentSeconds").asLong(0L);
+                String dev = worklog.path("author").path("displayName").asText(null);
+                if (dev != null && !dev.isBlank()) {
+                    developers.add(dev);
+                }
+            }
+            startAt += maxResults;
+        }
+
+        return new WorklogSummary(totalSeconds, new ArrayList<>(developers));
+    }
+
+    private record WorklogSummary(long totalSeconds, List<String> developers) {}
 
     private List<JsonNode> searchIssuesByJql(String jql, List<String> fields) throws Exception {
         final String urlString = JIRA_URL + SEARCH_JQL_API;
