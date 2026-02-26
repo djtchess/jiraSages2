@@ -226,3 +226,33 @@
   box-shadow: none;
   opacity: 0.9;
 }
+
+:host-context([data-theme='dark']) .info-box,
+:host-context(.dark-mode) .info-box {
+  background: linear-gradient(160deg, #12203a, #101b31);
+  border-color: #2e446d;
+}
+
+:host-context([data-theme='dark']) .stat,
+:host-context(.dark-mode) .stat {
+  background: linear-gradient(180deg, #1a2b4a, #14233d);
+  border-color: #355180;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:host-context([data-theme='dark']) .stat-value,
+:host-context(.dark-mode) .stat-value {
+  color: #eaf1ff;
+}
+
+:host-context([data-theme='dark']) .stat-label,
+:host-context(.dark-mode) .stat-label {
+  color: #aecaef;
+}
+
+:host-context([data-theme='dark']) .kpi-badge,
+:host-context(.dark-mode) .kpi-badge {
+  background: #1a2d4f;
+  border-color: #3d5c92;
+  color: #d6e6ff;
+}
