@@ -54,11 +54,6 @@
       <td mat-cell *matCellDef="let row">{{ formatVersions(row) }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="sprints">
-      <th mat-header-cell *matHeaderCellDef>Sprints</th>
-      <td mat-cell *matCellDef="let row">{{ formatSprints(row) }}</td>
-    </ng-container>
-
     <ng-container matColumnDef="storyPoints">
       <th mat-header-cell *matHeaderCellDef>Story Points</th>
       <td mat-cell *matCellDef="let row">{{ row.totalStoryPoints | number:'1.2-2' }}</td>
@@ -67,11 +62,6 @@
     <ng-container matColumnDef="days">
       <th mat-header-cell *matHeaderCellDef>Temps (jours)</th>
       <td mat-cell *matCellDef="let row">{{ row.totalTimeSpentDays | number:'1.2-2' }}</td>
-    </ng-container>
-
-    <ng-container matColumnDef="velocity">
-      <th mat-header-cell *matHeaderCellDef>Vélocité epic (SP/j)</th>
-      <td mat-cell *matCellDef="let row">{{ formatVelocity(row) }}</td>
     </ng-container>
 
     <ng-container matColumnDef="developers">
